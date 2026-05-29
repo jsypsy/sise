@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { Gowun_Batang } from "next/font/google";
 import "./globals.css";
 import Nav from "./nav";
+
+const gowun = Gowun_Batang({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-gowun",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "시세 — 아파트 실거래 시그널",
@@ -11,11 +19,16 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={gowun.variable}>
       <body className="bg-[var(--paper)] text-[var(--ink)] min-h-screen flex flex-col">
-        <header className="border-b-[3px] border-double border-[var(--line-strong)] px-4 py-3">
-          <h1 className="font-serif text-2xl font-bold tracking-tight">시세</h1>
-          <p className="text-xs text-[var(--ink-soft)] mt-0.5">
+        <header className="border-b-[3px] border-double border-[var(--line-strong)] px-4 py-4">
+          <h1
+            className="text-3xl font-bold tracking-tight"
+            style={{ fontFamily: "var(--font-gowun), serif" }}
+          >
+            시세
+          </h1>
+          <p className="text-xs text-[var(--ink-soft)] mt-1 tracking-widest uppercase">
             아파트 매매 실거래 시그널
           </p>
         </header>
