@@ -28,7 +28,7 @@ async function fetchTodayData(): Promise<{
     supabase.rpc("get_deal_dates", { lmt: 20 }),
   ]);
 
-  const availableDates = (dates ?? []).map((d: any) => d.deal_date as string).filter(Boolean);
+  const availableDates = (dates ?? []).map((d: { deal_date: string }) => d.deal_date).filter(Boolean);
 
   return {
     date: dateRow.deal_date as string,
