@@ -154,6 +154,11 @@ async function main() {
 
   console.log("수집 완료");
 
+  console.log("historical_peaks 동기화 중...");
+  const { error: syncErr } = await db.rpc("sync_peaks_from_transactions");
+  if (syncErr) console.error("peaks 동기화 실패:", syncErr.message);
+  else console.log("peaks 동기화 완료");
+
   console.log("만료 거래 아카이빙 중...");
   const { error: archiveErr } = await db.rpc("archive_expired_transactions");
   if (archiveErr) console.error("아카이빙 실패:", archiveErr.message);
