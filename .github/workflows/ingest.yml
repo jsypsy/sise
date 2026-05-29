@@ -25,3 +25,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+
+      - name: ISR 재검증
+        run: |
+          curl -sf -X POST "https://sise-ten.vercel.app/api/revalidate?secret=${{ secrets.REVALIDATE_SECRET }}" || true
