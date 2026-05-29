@@ -12,7 +12,7 @@ async function fetchTop(): Promise<Signal[]> {
   const sinceStr = since.toISOString().slice(0, 10);
 
   const { data } = await supabase
-    .from("signals_v")
+    .from("signals_mv")
     .select("*")
     .gte("deal_date", sinceStr)
     .eq("dealing_gbn", "중개거래")

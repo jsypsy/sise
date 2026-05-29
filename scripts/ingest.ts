@@ -153,6 +153,11 @@ async function main() {
   }
 
   console.log("수집 완료");
+
+  console.log("시그널 뷰 갱신 중...");
+  const { error: refreshErr } = await db.rpc("refresh_signals_mv");
+  if (refreshErr) console.error("시그널 뷰 갱신 실패:", refreshErr.message);
+  else console.log("시그널 뷰 갱신 완료");
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

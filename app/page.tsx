@@ -11,7 +11,7 @@ async function fetchTodayData(): Promise<{
   availableDates: string[];
 }> {
   const { data: dateRow } = await supabase
-    .from("signals_v")
+    .from("signals_mv")
     .select("deal_date")
     .order("deal_date", { ascending: false })
     .limit(1)
@@ -21,12 +21,12 @@ async function fetchTodayData(): Promise<{
 
   const [{ data: signals }, { data: dates }] = await Promise.all([
     supabase
-      .from("signals_v")
+      .from("signals_mv")
       .select("*")
       .eq("deal_date", dateRow.deal_date)
       .order("price", { ascending: false }),
     supabase
-      .from("signals_v")
+      .from("signals_mv")
       .select("deal_date")
       .order("deal_date", { ascending: false })
       .limit(300),

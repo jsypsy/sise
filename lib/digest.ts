@@ -5,7 +5,7 @@ import { CODE_TO_NAME } from "./regions";
 
 export async function buildDigestText(): Promise<{ text: string; date: string }> {
   const { data: dateRow } = await supabase
-    .from("signals_v")
+    .from("signals_mv")
     .select("deal_date")
     .order("deal_date", { ascending: false })
     .limit(1)
@@ -16,7 +16,7 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
   const date = dateRow.deal_date as string;
 
   const { data } = await supabase
-    .from("signals_v")
+    .from("signals_mv")
     .select("*")
     .eq("deal_date", date)
     .eq("dealing_gbn", "중개거래")

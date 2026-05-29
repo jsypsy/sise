@@ -103,7 +103,9 @@ function ComplexInner() {
     setHistory([]);
   }
 
-  const sggList = sido ? Object.entries(REGIONS[sido] ?? {}) : [];
+  const sggList = sido
+    ? Object.entries(REGIONS[sido] ?? {}).sort(([, a], [, b]) => a.localeCompare(b, "ko"))
+    : [];
 
   return (
     <div>

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   }
 
   const { data, error } = await supabase
-    .from("signals_v")
+    .from("signals_mv")
     .select("*")
     .eq("deal_date", date)
     .order("price", { ascending: false });

@@ -7,10 +7,10 @@ export async function GET(req: NextRequest) {
   const sgg = req.nextUrl.searchParams.get("sgg");
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
 
-  // 단지 거래 이력: apt + sgg 지정 시 signals_v에서 조회
+  // 단지 거래 이력: apt + sgg 지정 시 signals_mv에서 조회
   if (apt && sgg) {
     const { data } = await supabase
-      .from("signals_v")
+      .from("signals_mv")
       .select("*")
       .eq("apt_nm", apt)
       .eq("sgg_cd", sgg)
