@@ -1,0 +1,48 @@
+name: backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_ym:
+        description: '시작 년월 (YYYYMM)'
+        required: true
+        default: '202501'
+      to_ym:
+        description: '종료 년월 (YYYYMM)'
+        required: true
+        default: '202604'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: 소급 수집
+        run: |
+          ym=${{ inputs.from_ym }}
+          to=${{ inputs.to_ym }}
+          while [ "$ym" -le "$to" ]; do
+            echo "=== 수집: $ym ==="
+            npx tsx scripts/ingest.ts --ym=$ym
+            year=${ym:0:4}
+            month=$((10#${ym:4:2} + 1))
+            if [ $month -gt 12 ]; then month=1; year=$((year + 1)); fi
+            ym=$(printf "%04d%02d" $year $month)
+          done
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+
+      - name: ISR 재검증
+        run: |
+          curl -sf -X POST "https://sise-ten.vercel.app/api/revalidate?secret=${{ secrets.REVALIDATE_SECRET }}" || true
