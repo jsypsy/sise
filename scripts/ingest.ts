@@ -110,7 +110,7 @@ async function ingestSggYm(
     if (!rawItems) break;
 
     const items: MolitItem[] = Array.isArray(rawItems) ? rawItems : [rawItems];
-    const rows = items.map(i => refineItem(i, sgg_cd)).filter(Boolean);
+    const rows = items.map(i => refineItem(i, sgg_cd)).filter((r): r is NonNullable<typeof r> => r != null);
 
     if (rows.length) {
       const { error } = await db
