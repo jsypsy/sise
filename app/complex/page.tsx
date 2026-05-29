@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { won } from "@/lib/format";
-import { CODE_TO_NAME } from "@/lib/regions";
+import { REGIONS, SIDO_LIST, CODE_TO_NAME, CODE_TO_SIDO } from "@/lib/regions";
 import type { Signal } from "@/lib/types";
 import PriceChart from "./price-chart";
 
@@ -18,35 +18,64 @@ type SearchResult = {
 
 function ComplexInner() {
   const searchParams = useSearchParams();
+  const [sido, setSido] = useState("");
+  const [sggCd, setSggCd] = useState("");
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selected, setSelected] = useState<{ apt_nm: string; sgg_cd: string } | null>(null);
   const [history, setHistory] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const apt = searchParams.get("apt");
     const sgg = searchParams.get("sgg");
-    if (apt && sgg) handleSelect(apt, sgg);
+    if (apt && sgg) {
+      setSido(CODE_TO_SIDO[sgg] ?? "");
+      setSggCd(sgg);
+      setQuery(apt);
+      handleSelect(apt, sgg);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setLoading(true);
-    setSelected(null);
-    setHistory([]);
-    setSearched(true);
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
-    const data = await res.json();
-    setResults(data);
-    setLoading(false);
-  }
+  // 자동완성 디바운스
+  useEffect(() => {
+    if (!query.trim() || !sggCd) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const res = await fetch(
+        `/api/search?q=${encodeURIComponent(query.trim())}&sgg=${sggCd}`
+      );
+      const data = await res.json();
+      setSuggestions(data);
+      setShowSuggestions(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, sggCd]);
+
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (
+        inputRef.current?.contains(e.target as Node) ||
+        dropdownRef.current?.contains(e.target as Node)
+      ) return;
+      setShowSuggestions(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
 
   async function handleSelect(apt_nm: string, sgg_cd: string) {
     setSelected({ apt_nm, sgg_cd });
+    setShowSuggestions(false);
+    setQuery(apt_nm);
     setHistory([]);
     setLoading(true);
     const res = await fetch(
@@ -57,70 +86,97 @@ function ComplexInner() {
     setLoading(false);
   }
 
+  function handleSidoChange(next: string) {
+    setSido(next);
+    setSggCd("");
+    setQuery("");
+    setSuggestions([]);
+    setSelected(null);
+    setHistory([]);
+  }
+
+  function handleSggChange(next: string) {
+    setSggCd(next);
+    setQuery("");
+    setSuggestions([]);
+    setSelected(null);
+    setHistory([]);
+  }
+
+  const sggList = sido ? Object.entries(REGIONS[sido] ?? {}) : [];
+
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4">단지 조회</h2>
 
-      <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+      {/* 지역 선택 */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+        <select
+          value={sido}
+          onChange={(e) => handleSidoChange(e.target.value)}
+          className="border border-[var(--line)] rounded px-3 py-1.5 text-sm bg-[var(--paper)] focus:outline-none focus:border-[var(--ink-soft)]"
+        >
+          <option value="">시도 선택</option>
+          {SIDO_LIST.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select
+          value={sggCd}
+          onChange={(e) => handleSggChange(e.target.value)}
+          disabled={!sido}
+          className="border border-[var(--line)] rounded px-3 py-1.5 text-sm bg-[var(--paper)] focus:outline-none focus:border-[var(--ink-soft)] disabled:opacity-40"
+        >
+          <option value="">시군구 선택</option>
+          {sggList.map(([code, name]) => (
+            <option key={code} value={code}>{name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* 단지명 자동완성 */}
+      <div className="relative mb-6">
         <input
+          ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="단지명 검색 (예: 헬리오시티)"
-          className="flex-1 border border-[var(--line)] rounded px-3 py-1.5 text-sm bg-[var(--paper)] focus:outline-none focus:border-[var(--ink-soft)]"
+          onChange={(e) => { setQuery(e.target.value); setSelected(null); }}
+          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+          placeholder={sggCd ? "단지명 입력" : "시군구를 먼저 선택하세요"}
+          disabled={!sggCd}
+          className="w-full border border-[var(--line)] rounded px-3 py-1.5 text-sm bg-[var(--paper)] focus:outline-none focus:border-[var(--ink-soft)] disabled:opacity-40"
         />
-        <button
-          type="submit"
-          className="bg-[var(--ink)] text-[var(--paper)] text-sm px-4 py-1.5 rounded hover:opacity-80"
-        >
-          검색
-        </button>
-      </form>
+        {showSuggestions && suggestions.length > 0 && (
+          <div
+            ref={dropdownRef}
+            className="absolute z-10 w-full mt-1 border border-[var(--line)] rounded bg-[var(--paper)] shadow-md max-h-64 overflow-y-auto"
+          >
+            {suggestions.map((r) => (
+              <button
+                key={`${r.apt_nm}|${r.sgg_cd}`}
+                onMouseDown={() => handleSelect(r.apt_nm, r.sgg_cd)}
+                className="w-full text-left px-4 py-2.5 hover:bg-[var(--paper-2)] flex justify-between items-center"
+              >
+                <span className="text-sm font-medium">{r.apt_nm}</span>
+                <span className="text-xs text-[var(--ink-soft)]">
+                  {r.tx_count}건 · {won(r.peak_price)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {loading && <p className="text-sm text-[var(--ink-soft)]">로딩 중...</p>}
 
-      {!loading && searched && !selected && results.length === 0 && (
-        <p className="text-sm text-[var(--ink-soft)]">검색 결과가 없습니다.</p>
-      )}
-
-      {!selected && results.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--ink-soft)] mb-2">
-            {results.length}개 단지 · 클릭하면 거래 이력을 볼 수 있습니다
-          </p>
-          <ul className="divide-y divide-[var(--line)] border border-[var(--line)] rounded">
-            {results.map((r) => (
-              <li key={`${r.apt_nm}|${r.sgg_cd}`}>
-                <button
-                  onClick={() => handleSelect(r.apt_nm, r.sgg_cd)}
-                  className="w-full text-left px-4 py-3 hover:bg-[var(--paper-2)] flex justify-between items-center"
-                >
-                  <div>
-                    <span className="font-medium text-sm">{r.apt_nm}</span>
-                    <span className="text-xs text-[var(--ink-soft)] ml-2">
-                      {CODE_TO_NAME[r.sgg_cd] ?? r.sgg_cd}
-                    </span>
-                  </div>
-                  <div className="text-right text-xs text-[var(--ink-soft)]">
-                    <div>{r.tx_count}건</div>
-                    <div>최고 {won(r.peak_price)}</div>
-                    <div>{r.latest_date}</div>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {selected && (
+      {selected && !loading && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <button
-              onClick={() => setSelected(null)}
+              onClick={() => { setSelected(null); setHistory([]); }}
               className="text-xs text-[var(--ink-soft)] hover:underline"
             >
-              ← 검색 결과
+              ← 다시 검색
             </button>
             <h3 className="font-semibold">{selected.apt_nm}</h3>
             <span className="text-xs text-[var(--ink-soft)]">
@@ -128,13 +184,13 @@ function ComplexInner() {
             </span>
           </div>
 
-          {!loading && history.length > 0 && (
+          {history.length > 0 && (
             <div className="mb-6">
               <PriceChart signals={history} />
             </div>
           )}
 
-          {!loading && history.length === 0 ? (
+          {history.length === 0 ? (
             <p className="text-sm text-[var(--ink-soft)]">거래 이력이 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">

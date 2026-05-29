@@ -20,16 +20,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json((data as Signal[]) ?? []);
   }
 
-  // 단지 검색: q 기준 ILIKE, (apt_nm, sgg_cd) 그룹별 집계
+  // 단지 검색: q 기준 ILIKE, sgg 있으면 시군구 한정
   if (!q) return NextResponse.json([]);
 
-  const { data } = await supabase
+  let qb = supabase
     .from("transactions")
     .select("apt_nm, sgg_cd, umd_nm, price, deal_date, dealing_gbn, canceled")
     .ilike("apt_nm", `%${q}%`)
-    .eq("canceled", false)
-    .order("deal_date", { ascending: false })
-    .limit(300);
+    .eq("canceled", false);
+
+  if (sgg) qb = qb.eq("sgg_cd", sgg);
+
+  const { data } = await qb.order("deal_date", { ascending: false }).limit(300);
 
   const rows = data ?? [];
   const groups = new Map<
