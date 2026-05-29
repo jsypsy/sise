@@ -6,6 +6,7 @@ import { won } from "@/lib/format";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME, CODE_TO_SIDO } from "@/lib/regions";
 import type { Signal } from "@/lib/types";
 import PriceChart from "./price-chart";
+import TrendChart from "./trend-chart";
 
 type SearchResult = {
   apt_nm: string;
@@ -173,6 +174,12 @@ function ComplexInner() {
 
       {selected && !loading && (
         <div>
+          <TrendChart
+            aptNm={selected.apt_nm}
+            sggCd={selected.sgg_cd}
+            supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
+          />
+
           <div className="flex items-center gap-2 mb-4">
             <button
               onClick={() => { setSelected(null); setHistory([]); }}
