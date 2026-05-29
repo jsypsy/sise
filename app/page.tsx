@@ -25,7 +25,7 @@ async function fetchTodayData(): Promise<{
       .select("*")
       .eq("deal_date", dateRow.deal_date)
       .order("price", { ascending: false }),
-    supabase.rpc("get_deal_dates", { lmt: 90 }),
+    supabase.rpc("get_deal_dates", { lmt: 14 }),
   ]);
 
   const availableDates = (dates ?? []).map((d) => d as string);
