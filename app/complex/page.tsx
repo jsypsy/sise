@@ -4,6 +4,7 @@ import { useState } from "react";
 import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
 import type { Signal } from "@/lib/types";
+import PriceChart from "./price-chart";
 
 type SearchResult = {
   apt_nm: string;
@@ -67,9 +68,7 @@ export default function ComplexPage() {
         </button>
       </form>
 
-      {loading && (
-        <p className="text-sm text-[var(--ink-soft)]">로딩 중...</p>
-      )}
+      {loading && <p className="text-sm text-[var(--ink-soft)]">로딩 중...</p>}
 
       {!loading && searched && !selected && results.length === 0 && (
         <p className="text-sm text-[var(--ink-soft)]">검색 결과가 없습니다.</p>
@@ -107,7 +106,7 @@ export default function ComplexPage() {
 
       {selected && (
         <div>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-4">
             <button
               onClick={() => setSelected(null)}
               className="text-xs text-[var(--ink-soft)] hover:underline"
@@ -119,6 +118,13 @@ export default function ComplexPage() {
               {CODE_TO_NAME[selected.sgg_cd] ?? selected.sgg_cd}
             </span>
           </div>
+
+          {!loading && history.length > 0 && (
+            <div className="mb-6">
+              <PriceChart signals={history} />
+            </div>
+          )}
+
           {!loading && history.length === 0 ? (
             <p className="text-sm text-[var(--ink-soft)]">거래 이력이 없습니다.</p>
           ) : (
@@ -139,20 +145,15 @@ export default function ComplexPage() {
                       key={s.id}
                       className="border-b border-[var(--line)] hover:bg-[var(--paper-2)]"
                     >
-                      <td className="py-1.5 pr-3 tabular-nums text-xs">{s.deal_date}</td>
-                      <td className="py-1.5 pr-3 tabular-nums whitespace-nowrap">
+                      <td className="py-1.5 pr-3 text-xs">{s.deal_date}</td>
+                      <td className="py-1.5 pr-3 whitespace-nowrap">
                         {s.pyeong}평{s.floor != null ? ` ${s.floor}층` : ""}
                       </td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums font-medium whitespace-nowrap">
-                        <span
-                          className={
-                            s.is_high
-                              ? "text-[var(--red)]"
-                              : s.dealing_gbn === "직거래"
-                              ? "text-[var(--blue)]"
-                              : ""
-                          }
-                        >
+                      <td className="py-1.5 pr-3 text-right font-medium whitespace-nowrap">
+                        <span className={
+                          s.is_high ? "text-[var(--red)]"
+                          : s.dealing_gbn === "직거래" ? "text-[var(--blue)]" : ""
+                        }>
                           {won(s.price)}
                         </span>
                       </td>
@@ -171,23 +172,15 @@ export default function ComplexPage() {
                           <span className="text-xs text-[var(--blue)]">직</span>
                         )}
                       </td>
-                      <td className="py-1.5 text-right tabular-nums text-xs">
+                      <td className="py-1.5 text-right text-xs">
                         {s.delta_pct != null ? (
-                          <span
-                            className={
-                              s.delta_pct > 0
-                                ? "text-[var(--red)]"
-                                : s.delta_pct < 0
-                                ? "text-[var(--blue)]"
-                                : ""
-                            }
-                          >
-                            {s.delta_pct > 0 ? "+" : ""}
-                            {s.delta_pct}%
+                          <span className={
+                            s.delta_pct > 0 ? "text-[var(--red)]"
+                            : s.delta_pct < 0 ? "text-[var(--blue)]" : ""
+                          }>
+                            {s.delta_pct > 0 ? "+" : ""}{s.delta_pct}%
                           </span>
-                        ) : (
-                          "—"
-                        )}
+                        ) : "—"}
                       </td>
                     </tr>
                   ))}

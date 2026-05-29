@@ -1,48 +1,74 @@
 "use client";
 
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useState } from "react";
 import type { Signal } from "@/lib/types";
 import { won } from "@/lib/format";
-import { CODE_TO_NAME } from "@/lib/regions";
+import { REGIONS, CODE_TO_NAME, CODE_TO_SIDO, SIDO_LIST } from "@/lib/regions";
 
 export default function TodayClient({
-  date,
-  signals,
+  date: initialDate,
+  signals: initialSignals,
+  availableDates,
 }: {
   date: string;
   signals: Signal[];
+  availableDates: string[];
 }) {
-  const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  const [date, setDate] = useState(initialDate);
+  const [signals, setSignals] = useState(initialSignals);
+  const [loading, setLoading] = useState(false);
+  const [sidoFilter, setSidoFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
+  const [showDirect, setShowDirect] = useState(false);
 
-  const regionFilter = params.get("region") ?? "";
-  const showDirect = params.get("direct") === "1";
-
-  function setParam(key: string, val: string) {
-    const p = new URLSearchParams(params.toString());
-    if (val) p.set(key, val); else p.delete(key);
-    router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+  async function changeDate(newDate: string) {
+    if (newDate === date) return;
+    setLoading(true);
+    setSidoFilter("");
+    setRegionFilter("");
+    const res = await fetch(`/api/signals?date=${newDate}`);
+    const data = await res.json();
+    setSignals(data);
+    setDate(newDate);
+    setLoading(false);
   }
 
+  function changeSido(sido: string) {
+    setSidoFilter(sido);
+    setRegionFilter("");
+  }
+
+  const sidoCodes = sidoFilter ? Object.keys(REGIONS[sidoFilter] ?? {}) : [];
+
   const filtered = signals.filter((s) => {
+    if (sidoFilter && CODE_TO_SIDO[s.sgg_cd] !== sidoFilter) return false;
     if (regionFilter && s.sgg_cd !== regionFilter) return false;
     if (!showDirect && s.dealing_gbn === "직거래") return false;
     return true;
   });
 
-  const regions = [...new Set(signals.map((s) => s.sgg_cd))].sort();
   const highCnt = filtered.filter((s) => s.is_high).length;
-  const rebCnt = filtered.filter((s) => s.is_rebound).length;
-  const dirCnt = filtered.filter((s) => s.dealing_gbn === "직거래").length;
+  const rebCnt  = filtered.filter((s) => s.is_rebound).length;
+  const dirCnt  = filtered.filter((s) => s.dealing_gbn === "직거래").length;
 
   return (
     <div>
-      <div className="flex items-baseline gap-3 mb-3">
+      {/* 헤더 + 날짜 선택 */}
+      <div className="flex flex-wrap items-baseline gap-3 mb-3">
         <h2 className="text-lg font-semibold">오늘의 시그널</h2>
-        {date && <span className="text-sm text-[var(--ink-soft)]">{date}</span>}
+        <select
+          value={date}
+          onChange={(e) => changeDate(e.target.value)}
+          className="border border-[var(--line)] rounded px-2 py-1 text-sm bg-[var(--paper)]"
+        >
+          {availableDates.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        {loading && <span className="text-xs text-[var(--ink-soft)]">불러오는 중…</span>}
       </div>
 
+      {/* 요약 스트립 */}
       <div className="flex flex-wrap gap-4 mb-4 text-sm border-b border-[var(--line)] pb-3">
         <span>총 <strong>{filtered.length}</strong>건</span>
         <span className="text-[var(--red)]">신고가 <strong>{highCnt}</strong>건</span>
@@ -50,24 +76,39 @@ export default function TodayClient({
         <span className="text-[var(--blue)]">직거래 <strong>{dirCnt}</strong>건</span>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4 text-sm items-center">
+      {/* 필터 */}
+      <div className="flex flex-wrap gap-2 mb-4 text-sm items-center">
         <select
-          value={regionFilter}
-          onChange={(e) => setParam("region", e.target.value)}
+          value={sidoFilter}
+          onChange={(e) => changeSido(e.target.value)}
           className="border border-[var(--line)] rounded px-2 py-1 bg-[var(--paper)]"
         >
-          <option value="">전체 지역</option>
-          {regions.map((code) => (
-            <option key={code} value={code}>
-              {CODE_TO_NAME[code] ?? code}
-            </option>
+          <option value="">전체 시도</option>
+          {SIDO_LIST.map((sido) => (
+            <option key={sido} value={sido}>{sido}</option>
           ))}
         </select>
+
+        {sidoFilter && (
+          <select
+            value={regionFilter}
+            onChange={(e) => setRegionFilter(e.target.value)}
+            className="border border-[var(--line)] rounded px-2 py-1 bg-[var(--paper)]"
+          >
+            <option value="">전체 시군구</option>
+            {sidoCodes.map((code) => (
+              <option key={code} value={code}>
+                {REGIONS[sidoFilter][code]}
+              </option>
+            ))}
+          </select>
+        )}
+
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
             checked={showDirect}
-            onChange={(e) => setParam("direct", e.target.checked ? "1" : "")}
+            onChange={(e) => setShowDirect(e.target.checked)}
           />
           직거래 포함
         </label>
@@ -103,10 +144,10 @@ export default function TodayClient({
                       )}
                     </div>
                   </td>
-                  <td className="py-1.5 pr-3 tabular-nums whitespace-nowrap">
+                  <td className="py-1.5 pr-3 whitespace-nowrap">
                     {s.pyeong}평{s.floor != null ? ` ${s.floor}층` : ""}
                   </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums font-medium whitespace-nowrap">
+                  <td className="py-1.5 pr-3 text-right font-medium whitespace-nowrap">
                     <span className={s.is_high ? "text-[var(--red)]" : ""}>
                       {won(s.price)}
                     </span>
@@ -123,26 +164,18 @@ export default function TodayClient({
                       </span>
                     )}
                   </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--ink-soft)] whitespace-nowrap">
+                  <td className="py-1.5 pr-3 text-right text-[var(--ink-soft)] whitespace-nowrap">
                     {s.prev_peak ? won(s.prev_peak) : "—"}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                  <td className="py-1.5 text-right whitespace-nowrap">
                     {s.delta_pct != null ? (
-                      <span
-                        className={
-                          s.delta_pct > 0
-                            ? "text-[var(--red)]"
-                            : s.delta_pct < 0
-                            ? "text-[var(--blue)]"
-                            : ""
-                        }
-                      >
-                        {s.delta_pct > 0 ? "+" : ""}
-                        {s.delta_pct}%
+                      <span className={
+                        s.delta_pct > 0 ? "text-[var(--red)]"
+                        : s.delta_pct < 0 ? "text-[var(--blue)]" : ""
+                      }>
+                        {s.delta_pct > 0 ? "+" : ""}{s.delta_pct}%
                       </span>
-                    ) : (
-                      "—"
-                    )}
+                    ) : "—"}
                   </td>
                 </tr>
               ))}

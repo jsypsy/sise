@@ -5,7 +5,11 @@ import { supabase } from "@/lib/supabase";
 import type { Signal } from "@/lib/types";
 import TodayClient from "./today-client";
 
-async function fetchTodaySignals(): Promise<{ date: string; signals: Signal[] }> {
+async function fetchTodayData(): Promise<{
+  date: string;
+  signals: Signal[];
+  availableDates: string[];
+}> {
   const { data: dateRow } = await supabase
     .from("signals_v")
     .select("deal_date")
@@ -13,25 +17,35 @@ async function fetchTodaySignals(): Promise<{ date: string; signals: Signal[] }>
     .limit(1)
     .single();
 
-  if (!dateRow) return { date: "", signals: [] };
+  if (!dateRow) return { date: "", signals: [], availableDates: [] };
 
-  const { data } = await supabase
-    .from("signals_v")
-    .select("*")
-    .eq("deal_date", dateRow.deal_date)
-    .order("price", { ascending: false });
+  const [{ data: signals }, { data: dates }] = await Promise.all([
+    supabase
+      .from("signals_v")
+      .select("*")
+      .eq("deal_date", dateRow.deal_date)
+      .order("price", { ascending: false }),
+    supabase
+      .from("signals_v")
+      .select("deal_date")
+      .order("deal_date", { ascending: false })
+      .limit(300),
+  ]);
+
+  const availableDates = [...new Set((dates ?? []).map((d) => d.deal_date as string))];
 
   return {
     date: dateRow.deal_date as string,
-    signals: (data as Signal[]) ?? [],
+    signals: (signals as Signal[]) ?? [],
+    availableDates,
   };
 }
 
 export default async function TodayPage() {
-  const { date, signals } = await fetchTodaySignals();
+  const { date, signals, availableDates } = await fetchTodayData();
   return (
     <Suspense>
-      <TodayClient date={date} signals={signals} />
+      <TodayClient date={date} signals={signals} availableDates={availableDates} />
     </Suspense>
   );
 }
