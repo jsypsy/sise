@@ -14,10 +14,13 @@ CREATE TABLE IF NOT EXISTS historical_peaks (
 );
 
 ALTER TABLE historical_peaks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "public read" ON historical_peaks;
 CREATE POLICY "public read" ON historical_peaks FOR SELECT USING (true);
 
 -- 2. get_deal_dates 수정: RETURNS TABLE(deal_date text)로 명시적 컬럼명
 --    (RETURNS SETOF date는 PostgREST에서 컬럼명이 함수명이 되어 JS 처리 불일치)
+--    반환 타입 변경 시 DROP 후 재생성 필요
+DROP FUNCTION IF EXISTS get_deal_dates(integer);
 CREATE OR REPLACE FUNCTION get_deal_dates(lmt int DEFAULT 20)
 RETURNS TABLE(deal_date text)
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
