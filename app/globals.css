@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #FAF7F0;
+  --paper-2: #F3EEE3;
+  --ink: #1A1814;
+  --ink-soft: #5C564C;
+  --line: #D8D0BE;
+  --line-strong: #1A1814;
+  --red: #C7321F;
+  --red-bg: #F8E7E2;
+  --blue: #2C557E;
+  --gold: #9A7B1F;
+  --gold-bg: #F4ECD2;
+}
+
+body {
+  font-family: "Pretendard", "Apple SD Gothic Neo", sans-serif;
+}
