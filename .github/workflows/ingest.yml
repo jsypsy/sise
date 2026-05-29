@@ -3,7 +3,12 @@ name: ingest
 on:
   schedule:
     - cron: "10 20 * * *"   # KST 05:10 = UTC 20:10
-  workflow_dispatch:         # 수동 실행 허용
+  workflow_dispatch:
+    inputs:
+      ym:
+        description: '수집 년월 (YYYYMM). 비워두면 당월 자동'
+        required: false
+        default: ''
 
 jobs:
   ingest:
@@ -19,7 +24,7 @@ jobs:
       - run: npm ci
 
       - name: 실거래가 수집
-        run: npx tsx scripts/ingest.ts
+        run: npx tsx scripts/ingest.ts ${{ inputs.ym != '' && format('--ym={0}', inputs.ym) || '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

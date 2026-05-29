@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       from_ym:
-        description: '시작 년월 (YYYYMM) — 과거 최고가 수집 시작'
+        description: '시작 년월 (YYYYMM) — API 제공 최초 시점 기준'
         required: true
-        default: '202201'
+        default: '200601'
       to_ym:
         description: '종료 년월 (YYYYMM) — transactions 시작 직전 달까지'
         required: true

@@ -3,7 +3,7 @@
  * historical_peaks에 적재한다. 신고가 정확도 확보용 1회성 작업.
  *
  * 사용법:
- *   tsx scripts/fetch_peaks.ts --from=202201 --to=202412
+ *   tsx scripts/fetch_peaks.ts --from=200601 --to=202412
  */
 import { XMLParser } from "fast-xml-parser";
 import { createServiceClient } from "../lib/supabase";
@@ -13,6 +13,8 @@ import { refineItem } from "./ingest";
 try { process.loadEnvFile(".env.local"); } catch { /* noop */ }
 
 const parser = new XMLParser();
+
+type Peak = { apt_nm: string; sgg_cd: string; pyeong: number; peak_price: number; peak_date: string };
 
 function parseArgs(): Record<string, string> {
   return Object.fromEntries(
@@ -37,13 +39,74 @@ function monthRange(from: string, to: string): string[] {
   return months;
 }
 
+async function fetchRegion(
+  sgg_cd: string,
+  months: string[],
+  peaks: Map<string, Peak>,
+  molitKey: string,
+): Promise<void> {
+  for (const ym of months) {
+    try {
+      let pageNo = 1, totalCount = 0, fetched = 0;
+      do {
+        const url = new URL(
+          "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
+        );
+        url.searchParams.set("serviceKey", molitKey);
+        url.searchParams.set("LAWD_CD", sgg_cd);
+        url.searchParams.set("DEAL_YMD", ym);
+        url.searchParams.set("pageNo", String(pageNo));
+        url.searchParams.set("numOfRows", "1000");
+
+        const res = await fetch(url.toString());
+        if (!res.ok) break;
+
+        const parsed = parser.parse(await res.text());
+        const body   = parsed?.response?.body;
+        if (!body) break;
+
+        if (pageNo === 1) totalCount = parseInt(String(body.totalCount ?? "0"), 10);
+        if (totalCount === 0) break;
+
+        const rawItems = body?.items?.item;
+        if (!rawItems) break;
+
+        const items = Array.isArray(rawItems) ? rawItems : [rawItems];
+        for (const item of items) {
+          const r = refineItem(item, sgg_cd);
+          if (!r || r.canceled) continue;
+
+          const key      = `${r.apt_nm}|${r.sgg_cd}|${r.pyeong}`;
+          const existing = peaks.get(key);
+          if (!existing || r.price > existing.peak_price) {
+            peaks.set(key, {
+              apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, pyeong: r.pyeong,
+              peak_price: r.price, peak_date: r.deal_date,
+            });
+          }
+        }
+
+        fetched += items.length;
+        pageNo++;
+      } while (fetched < totalCount);
+
+      // 데이터 있는 달만 delay — 빈 달은 바로 다음 달로
+      if (totalCount > 0) {
+        await new Promise(r => setTimeout(r, 150));
+      }
+    } catch (err) {
+      console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
+    }
+  }
+}
+
 async function main() {
   const molitKey = process.env.MOLIT_SERVICE_KEY;
   if (!molitKey) { console.error("MOLIT_SERVICE_KEY 없음"); process.exit(1); }
 
   const db   = createServiceClient();
   const args = parseArgs();
-  const from = args.from ?? "202201";
+  const from = args.from ?? "200601";
   const to   = args.to   ?? "202412";
 
   const targets = Object.values(REGIONS).flatMap(m => Object.keys(m));
@@ -52,62 +115,15 @@ async function main() {
   console.log(`수집 범위: ${from}~${to} (${months.length}개월, ${targets.length}개 지역)`);
   console.log("거래 원본은 저장하지 않고 그룹별 최고가만 추적합니다.");
 
-  // 메모리 내 최고가 추적: "apt_nm|sgg_cd|pyeong" → 피크 정보
-  type Peak = { apt_nm: string; sgg_cd: string; pyeong: number; peak_price: number; peak_date: string };
+  // 지역 3개씩 병렬 처리 — 순차 대비 약 3x 단축 (6시간 한도 이내)
   const peaks = new Map<string, Peak>();
-
-  for (const sgg_cd of targets) {
-    for (const ym of months) {
-      try {
-        let pageNo = 1, totalCount = 0, fetched = 0;
-        do {
-          const url = new URL(
-            "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
-          );
-          url.searchParams.set("serviceKey", molitKey);
-          url.searchParams.set("LAWD_CD", sgg_cd);
-          url.searchParams.set("DEAL_YMD", ym);
-          url.searchParams.set("pageNo", String(pageNo));
-          url.searchParams.set("numOfRows", "1000");
-
-          const res = await fetch(url.toString());
-          if (!res.ok) break;
-
-          const parsed = parser.parse(await res.text());
-          const body   = parsed?.response?.body;
-          if (!body) break;
-
-          if (pageNo === 1) totalCount = parseInt(String(body.totalCount ?? "0"), 10);
-          if (totalCount === 0) break;
-
-          const rawItems = body?.items?.item;
-          if (!rawItems) break;
-
-          const items = Array.isArray(rawItems) ? rawItems : [rawItems];
-          for (const item of items) {
-            const r = refineItem(item, sgg_cd);
-            if (!r || r.canceled) continue; // 취소거래 제외
-
-            const key      = `${r.apt_nm}|${r.sgg_cd}|${r.pyeong}`;
-            const existing = peaks.get(key);
-            if (!existing || r.price > existing.peak_price) {
-              peaks.set(key, {
-                apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, pyeong: r.pyeong,
-                peak_price: r.price, peak_date: r.deal_date,
-              });
-            }
-          }
-
-          fetched += items.length;
-          pageNo++;
-        } while (fetched < totalCount);
-
-      } catch (err) {
-        console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
-      }
-      await new Promise(r => setTimeout(r, 150)); // 429 방지
-    }
-    process.stdout.write(`  ${sgg_cd} 완료 (누적 그룹 ${peaks.size}개)\r`);
+  const CONCURRENCY = 3;
+  for (let i = 0; i < targets.length; i += CONCURRENCY) {
+    const batch = targets.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(sgg_cd => fetchRegion(sgg_cd, months, peaks, molitKey)));
+    process.stdout.write(
+      `  ${Math.min(i + CONCURRENCY, targets.length)}/${targets.length} 지역 완료 (누적 그룹 ${peaks.size}개)\r`
+    );
   }
 
   console.log(`\n피크 수집 완료: ${peaks.size}개 그룹`);

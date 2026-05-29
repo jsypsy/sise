@@ -154,6 +154,11 @@ async function main() {
 
   console.log("수집 완료");
 
+  console.log("만료 거래 아카이빙 중...");
+  const { error: archiveErr } = await db.rpc("archive_expired_transactions");
+  if (archiveErr) console.error("아카이빙 실패:", archiveErr.message);
+  else console.log("아카이빙 완료 (20일 초과 거래 → historical_peaks 병합 후 삭제)");
+
   console.log("시그널 뷰 갱신 중...");
   const { error: refreshErr } = await db.rpc("refresh_signals_mv");
   if (refreshErr) console.error("시그널 뷰 갱신 실패:", refreshErr.message);
