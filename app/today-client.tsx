@@ -125,8 +125,8 @@ export default function TodayClient({
                 <th className="py-2 pr-3 font-medium">평형/층</th>
                 <th className="py-2 pr-3 font-medium text-right">거래가</th>
                 <th className="py-2 pr-3 font-medium">시그널</th>
-                <th className="py-2 pr-3 font-medium text-right">직전최고</th>
-                <th className="py-2 font-medium text-right">증감</th>
+                <th className="py-2 pr-3 font-medium text-right hidden sm:table-cell">직전최고</th>
+                <th className="py-2 font-medium text-right hidden sm:table-cell">증감</th>
               </tr>
             </thead>
             <tbody>
@@ -164,10 +164,10 @@ export default function TodayClient({
                       </span>
                     )}
                   </td>
-                  <td className="py-1.5 pr-3 text-right text-[var(--ink-soft)] whitespace-nowrap">
+                  <td className="py-1.5 pr-3 text-right text-[var(--ink-soft)] whitespace-nowrap hidden sm:table-cell">
                     {s.prev_peak ? won(s.prev_peak) : "—"}
                   </td>
-                  <td className="py-1.5 text-right whitespace-nowrap">
+                  <td className="py-1.5 text-right whitespace-nowrap hidden sm:table-cell">
                     {s.delta_pct != null ? (
                       <span className={
                         s.delta_pct > 0 ? "text-[var(--red)]"

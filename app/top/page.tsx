@@ -37,10 +37,10 @@ export default async function TopPage() {
               <tr className="border-b-2 border-[var(--line-strong)] text-left text-xs text-[var(--ink-soft)]">
                 <th className="py-2 pr-2 font-medium w-6">#</th>
                 <th className="py-2 pr-3 font-medium">단지</th>
-                <th className="py-2 pr-3 font-medium">평형/층</th>
+                <th className="py-2 pr-3 font-medium hidden sm:table-cell">평형/층</th>
                 <th className="py-2 pr-3 font-medium text-right">거래가</th>
-                <th className="py-2 pr-3 font-medium">시그널</th>
-                <th className="py-2 font-medium text-right">거래일</th>
+                <th className="py-2 pr-3 font-medium hidden sm:table-cell">시그널</th>
+                <th className="py-2 font-medium text-right hidden sm:table-cell">거래일</th>
               </tr>
             </thead>
             <tbody>
@@ -58,7 +58,7 @@ export default async function TopPage() {
                       {CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd}
                     </div>
                   </td>
-                  <td className="py-1.5 pr-3 tabular-nums whitespace-nowrap">
+                  <td className="py-1.5 pr-3 tabular-nums whitespace-nowrap hidden sm:table-cell">
                     {s.pyeong}평{s.floor != null ? ` ${s.floor}층` : ""}
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums font-medium whitespace-nowrap">
@@ -66,7 +66,7 @@ export default async function TopPage() {
                       {won(s.price)}
                     </span>
                   </td>
-                  <td className="py-1.5 pr-3 whitespace-nowrap">
+                  <td className="py-1.5 pr-3 whitespace-nowrap hidden sm:table-cell">
                     {s.is_high && (
                       <span className="bg-[var(--red)] text-white text-xs px-1.5 py-0.5 rounded">
                         신고가
@@ -78,7 +78,7 @@ export default async function TopPage() {
                       </span>
                     )}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums text-xs text-[var(--ink-soft)]">
+                  <td className="py-1.5 text-right tabular-nums text-xs text-[var(--ink-soft)] hidden sm:table-cell">
                     {s.deal_date}
                   </td>
                 </tr>
