@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
 import type { Signal } from "@/lib/types";
@@ -15,13 +16,21 @@ type SearchResult = {
   peak_price: number;
 };
 
-export default function ComplexPage() {
+function ComplexInner() {
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState<{ apt_nm: string; sgg_cd: string } | null>(null);
   const [history, setHistory] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    const apt = searchParams.get("apt");
+    const sgg = searchParams.get("sgg");
+    if (apt && sgg) handleSelect(apt, sgg);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -191,5 +200,13 @@ export default function ComplexPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ComplexPage() {
+  return (
+    <Suspense>
+      <ComplexInner />
+    </Suspense>
   );
 }

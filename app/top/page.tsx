@@ -1,5 +1,6 @@
 export const revalidate = 86400;
 
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import type { Signal } from "@/lib/types";
 import { won } from "@/lib/format";
@@ -53,7 +54,12 @@ export default async function TopPage() {
                     {i + 1}
                   </td>
                   <td className="py-1.5 pr-3">
-                    <div className="font-medium">{s.apt_nm}</div>
+                    <Link
+                      href={`/complex?apt=${encodeURIComponent(s.apt_nm)}&sgg=${encodeURIComponent(s.sgg_cd)}`}
+                      className="font-medium hover:underline"
+                    >
+                      {s.apt_nm}
+                    </Link>
                     <div className="text-xs text-[var(--ink-soft)]">
                       {CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd}
                     </div>

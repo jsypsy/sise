@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Signal } from "@/lib/types";
 import { won } from "@/lib/format";
 import { REGIONS, CODE_TO_NAME, CODE_TO_SIDO, SIDO_LIST } from "@/lib/regions";
@@ -136,7 +137,12 @@ export default function TodayClient({
                   className="border-b border-[var(--line)] hover:bg-[var(--paper-2)]"
                 >
                   <td className="py-1.5 pr-3">
-                    <div className="font-medium">{s.apt_nm}</div>
+                    <Link
+                      href={`/complex?apt=${encodeURIComponent(s.apt_nm)}&sgg=${encodeURIComponent(s.sgg_cd)}`}
+                      className="font-medium hover:underline"
+                    >
+                      {s.apt_nm}
+                    </Link>
                     <div className="text-xs text-[var(--ink-soft)]">
                       {CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd}
                       {s.dealing_gbn === "직거래" && (
