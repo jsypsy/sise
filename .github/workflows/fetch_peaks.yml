@@ -1,0 +1,39 @@
+name: fetch-peaks
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_ym:
+        description: '시작 년월 (YYYYMM) — 과거 최고가 수집 시작'
+        required: true
+        default: '202201'
+      to_ym:
+        description: '종료 년월 (YYYYMM) — transactions 시작 직전 달까지'
+        required: true
+        default: '202412'
+
+jobs:
+  fetch-peaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360    # 최대 6시간 (전국 3년치 기준)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: 과거 최고가 수집
+        run: npx tsx scripts/fetch_peaks.ts --from=${{ inputs.from_ym }} --to=${{ inputs.to_ym }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+
+      - name: ISR 재검증
+        run: |
+          curl -sf -X POST "https://sise-ten.vercel.app/api/revalidate?secret=${{ secrets.REVALIDATE_SECRET }}" || true
