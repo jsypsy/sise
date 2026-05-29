@@ -100,9 +100,13 @@ npx tsx scripts/ingest.ts
 ### GitHub Actions (수집 cron)
 
 1. GitHub 레포 → **Settings → Secrets and variables → Actions** 에서 아래 secrets를 등록합니다:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `MOLIT_SERVICE_KEY`
+
+   | Secret 이름 | 값 |
+   |---|---|
+   | `SUPABASE_URL` | Supabase 프로젝트 URL |
+   | `SUPABASE_ANON_KEY` | Supabase anon(공개) 키 |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role 키 |
+   | `MOLIT_SERVICE_KEY` | 공공데이터포털 인증키 **(Decoding, URL 디코딩된 값)** |
 2. `.github/workflows/ingest.yml`이 매일 KST 05:10(UTC 20:10)에 자동 실행됩니다.
 3. 첫 실행은 수동으로: Actions 탭 → `ingest` workflow → **Run workflow**.
 
