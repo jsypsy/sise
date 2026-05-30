@@ -32,28 +32,5 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
 
-  fetch-peaks:
-    needs: [reset-and-ingest]
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - run: npm ci
-
-      - name: 역대 최고가 수집 (200601~202604)
-        run: npx tsx scripts/fetch_peaks.ts --from=200601 --to=202604
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
-
-      - name: ISR 재검증
-        run: |
-          curl -sf -X POST "https://sise-ten.vercel.app/api/revalidate?secret=${{ secrets.REVALIDATE_SECRET }}" || true
+  # fetch-peaks는 일일 API quota(10,000콜) 한계로 3년씩 나눠 실행.
+  # fetch_peaks.yml 워크플로우를 직접 실행: 200601-200912 / 201001-201312 / 201401-201712 / 201801-202112 / 202201-현재전달
