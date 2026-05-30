@@ -168,9 +168,9 @@ async function main() {
   const rows  = [...peaks.values()];
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
-    const { error } = await db
-      .from("historical_peaks")
-      .upsert(rows.slice(i, i + BATCH), { onConflict: "apt_nm,sgg_cd,pyeong" });
+    const { error } = await db.rpc("upsert_peaks_if_higher", {
+      p_rows: rows.slice(i, i + BATCH),
+    });
     if (error) console.error(`  batch ${i} 오류:`, error.message);
   }
 
