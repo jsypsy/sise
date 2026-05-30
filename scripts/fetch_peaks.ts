@@ -49,6 +49,17 @@ function monthRange(from: string, to: string): string[] {
   return months;
 }
 
+async function fetchWithRetry(url: string, sgg_cd: string, ym: string, attempt = 0): Promise<Response> {
+  const res = await fetch(url);
+  if (res.status === 429 && attempt < 4) {
+    const wait = 2000 * Math.pow(2, attempt);
+    console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/4)`);
+    await new Promise(r => setTimeout(r, wait));
+    return fetchWithRetry(url, sgg_cd, ym, attempt + 1);
+  }
+  return res;
+}
+
 async function fetchRegion(
   sgg_cd: string,
   months: string[],
@@ -69,7 +80,7 @@ async function fetchRegion(
         url.searchParams.set("pageNo", String(pageNo));
         url.searchParams.set("numOfRows", "1000");
 
-        const res = await fetch(url.toString());
+        const res = await fetchWithRetry(url.toString(), sgg_cd, ym);
         if (!res.ok) break;
 
         const parsed = parser.parse(await res.text());
