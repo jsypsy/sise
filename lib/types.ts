@@ -1,6 +1,7 @@
 export type Tx = {
   id: number;
   apt_nm: string;
+  apt_seq: string | null;
   sgg_cd: string;
   umd_nm: string | null;
   jibun: string | null;

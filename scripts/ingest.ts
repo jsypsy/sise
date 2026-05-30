@@ -10,6 +10,7 @@ const parser = new XMLParser();
 // ─── 타입 ─────────────────────────────────────────────────────
 interface MolitItem {
   aptNm?: string | number;
+  aptSeq?: string | number;
   umdNm?: string | number;
   jibun?: string | number;
   excluUseAr?: string | number;
@@ -47,6 +48,7 @@ function pad2(n: string | number) {
 export function refineItem(item: MolitItem, sgg_cd: string) {
   const apt_nm = String(item.aptNm ?? "").trim();
   if (!apt_nm) return null;
+  const apt_seq = item.aptSeq ? String(item.aptSeq).trim() || null : null;
 
   const area = parseFloat(String(item.excluUseAr ?? "0").trim());
   if (!area) return null;
@@ -70,7 +72,7 @@ export function refineItem(item: MolitItem, sgg_cd: string) {
 
   const raw_key = `${apt_nm}|${umd_nm ?? ""}|${jibun ?? ""}|${area.toFixed(2)}|${floor ?? ""}|${deal_date}|${price}`;
 
-  return { apt_nm, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year, dealing_gbn, canceled, cdeal_day, road_nm, raw_key };
+  return { apt_nm, apt_seq, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year, dealing_gbn, canceled, cdeal_day, road_nm, raw_key };
 }
 
 // ─── 수집 ─────────────────────────────────────────────────────
@@ -90,7 +92,18 @@ async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo:
     return fetchPage(serviceKey, sgg_cd, ym, pageNo, attempt + 1);
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return parser.parse(await res.text());
+
+  const parsed = parser.parse(await res.text());
+  const resultCode = String(parsed?.response?.header?.resultCode ?? "000").trim();
+  if (resultCode === "22") {
+    // HTTP 200이지만 일일 quota 소진 — consecutive429 카운터 증가로 조기 종료 트리거
+    console.warn(`  [${sgg_cd}/${ym}] resultCode=22 — 일일 quota 소진`);
+    throw new Error("429");
+  }
+  if (resultCode !== "000" && resultCode !== "03") {
+    throw new Error(`API 오류 resultCode=${resultCode}`);
+  }
+  return parsed;
 }
 
 async function ingestSggYm(

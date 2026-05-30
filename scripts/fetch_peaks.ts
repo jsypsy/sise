@@ -84,6 +84,17 @@ async function fetchRegion(
         if (!res.ok) break;
 
         const parsed = parser.parse(await res.text());
+        const resultCode = String(parsed?.response?.header?.resultCode ?? "000").trim();
+        if (resultCode === "22") {
+          // 일일 quota 소진 — 이 지역의 남은 달 중단 (누적 데이터는 그대로 유지)
+          console.warn(`  [${sgg_cd}] resultCode=22 — quota 소진. 배치 중단.`);
+          return;
+        }
+        if (resultCode !== "000" && resultCode !== "03") {
+          console.warn(`  [${sgg_cd}/${ym}] resultCode=${resultCode} — 건너뜀`);
+          break;
+        }
+
         const body   = parsed?.response?.body;
         if (!body) break;
 
