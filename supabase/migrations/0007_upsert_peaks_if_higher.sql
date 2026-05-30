@@ -11,7 +11,7 @@ as $$
     (r->>'sgg_cd'),
     (r->>'pyeong')::int,
     (r->>'peak_price')::int,
-    (r->>'peak_date')
+    (r->>'peak_date')::date
   from jsonb_array_elements(p_rows) as r
   on conflict (apt_nm, sgg_cd, pyeong)
   do update set
