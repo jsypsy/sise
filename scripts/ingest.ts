@@ -149,11 +149,22 @@ async function main() {
 
   console.log(`수집 시작: ${targets.length}개 지역, ${ym}`);
 
+  let consecutive429 = 0;
   for (const sgg_cd of targets) {
     try {
       await ingestSggYm(molitKey, sgg_cd, ym, db);
+      consecutive429 = 0;
     } catch (err) {
       console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
+      if (String(err).includes("429")) {
+        consecutive429++;
+        if (consecutive429 >= 5) {
+          console.error("연속 5회 429 — 일일 quota 소진. 수집 조기 종료.");
+          break;
+        }
+      } else {
+        consecutive429 = 0;
+      }
     }
     await new Promise(r => setTimeout(r, 300)); // 429 방지
   }
