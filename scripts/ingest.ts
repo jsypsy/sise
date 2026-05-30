@@ -74,7 +74,7 @@ export function refineItem(item: MolitItem, sgg_cd: string) {
 }
 
 // ─── 수집 ─────────────────────────────────────────────────────
-async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo: number) {
+async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo: number, attempt = 0): Promise<ReturnType<typeof parser.parse>> {
   const url = new URL("https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev");
   url.searchParams.set("serviceKey", serviceKey);
   url.searchParams.set("LAWD_CD", sgg_cd);
@@ -83,6 +83,12 @@ async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo:
   url.searchParams.set("numOfRows", "1000");
 
   const res = await fetch(url.toString());
+  if (res.status === 429 && attempt < 4) {
+    const wait = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s
+    console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/4)`);
+    await new Promise(r => setTimeout(r, wait));
+    return fetchPage(serviceKey, sgg_cd, ym, pageNo, attempt + 1);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return parser.parse(await res.text());
 }
@@ -149,7 +155,7 @@ async function main() {
     } catch (err) {
       console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
     }
-    await new Promise(r => setTimeout(r, 200)); // 429 방지
+    await new Promise(r => setTimeout(r, 300)); // 429 방지
   }
 
   console.log("수집 완료");
