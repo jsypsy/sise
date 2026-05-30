@@ -1,0 +1,60 @@
+name: fetch-peaks-schedule
+
+on:
+  schedule:
+    - cron: "0 22 31 5 *"   # UTC 2026-05-31 22:00 = KST 2026-06-01 07:00
+    - cron: "0 22 1-4 6 *"  # UTC 2026-06-01~04 22:00 = KST 2026-06-02~05 07:00
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: '배치 번호 (1~5). 비워두면 오늘 날짜로 자동 결정'
+        required: false
+        default: ''
+
+jobs:
+  fetch-peaks-batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: 배치 결정 및 실행
+        run: |
+          BATCH="${{ inputs.batch }}"
+          if [ -z "$BATCH" ]; then
+            DATE=$(date -u +%Y-%m-%d)
+            case $DATE in
+              "2026-05-31") BATCH=1 ;;
+              "2026-06-01") BATCH=2 ;;
+              "2026-06-02") BATCH=3 ;;
+              "2026-06-03") BATCH=4 ;;
+              "2026-06-04") BATCH=5 ;;
+              *) echo "오늘($DATE)은 예정된 배치 없음. 종료."; exit 0 ;;
+            esac
+          fi
+          case $BATCH in
+            1) FROM=200601; TO=200912 ;;
+            2) FROM=201001; TO=201312 ;;
+            3) FROM=201401; TO=201712 ;;
+            4) FROM=201801; TO=202112 ;;
+            5) FROM=202201; TO=202604 ;;
+            *) echo "잘못된 배치 번호: $BATCH"; exit 1 ;;
+          esac
+          echo "배치 $BATCH 실행: $FROM ~ $TO"
+          npx tsx scripts/fetch_peaks.ts --from=$FROM --to=$TO
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+
+      - name: ISR 재검증
+        run: |
+          curl -sf -X POST "https://sise-ten.vercel.app/api/revalidate?secret=${{ secrets.REVALIDATE_SECRET }}" || true
