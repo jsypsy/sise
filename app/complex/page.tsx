@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { won } from "@/lib/format";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME, CODE_TO_SIDO } from "@/lib/regions";
 import type { Signal } from "@/lib/types";
-import PriceChart from "./price-chart";
 import TrendChart from "./trend-chart";
 
 type SearchResult = {
@@ -192,12 +191,6 @@ function ComplexInner() {
               {CODE_TO_NAME[selected.sgg_cd] ?? selected.sgg_cd}
             </span>
           </div>
-
-          {history.length > 0 && (
-            <div className="mb-6">
-              <PriceChart signals={history} />
-            </div>
-          )}
 
           {history.length === 0 ? (
             <p className="text-sm text-[var(--ink-soft)]">거래 이력이 없습니다.</p>
