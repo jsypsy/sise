@@ -1,30 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
 import { createServiceClient } from "../lib/supabase";
 import { REGIONS } from "../lib/regions";
+import { refineItem, type MolitItem } from "../lib/refine";
 
 // 로컬 개발 시 .env.local 로드 (GitHub Actions에선 이미 환경변수 주입됨)
 try { process.loadEnvFile(".env.local"); } catch { /* noop */ }
 
 const parser = new XMLParser();
-
-// ─── 타입 ─────────────────────────────────────────────────────
-interface MolitItem {
-  aptNm?: string | number;
-  aptSeq?: string | number;
-  umdNm?: string | number;
-  jibun?: string | number;
-  excluUseAr?: string | number;
-  dealAmount?: string | number;
-  dealYear?: string | number;
-  dealMonth?: string | number;
-  dealDay?: string | number;
-  floor?: string | number;
-  buildYear?: string | number;
-  dealingGbn?: string;
-  cdealType?: string;
-  cdealDay?: string | number;
-  roadNm?: string | number;
-}
 
 // ─── 헬퍼 ────────────────────────────────────────────────────
 function parseArgs(): Record<string, string> {
@@ -38,41 +20,6 @@ function parseArgs(): Record<string, string> {
 function currentYmKst(): string {
   const kst = new Date(Date.now() + 9 * 3600_000);
   return kst.toISOString().slice(0, 7).replace("-", "");
-}
-
-function pad2(n: string | number) {
-  return String(n).padStart(2, "0");
-}
-
-// ─── 정제 ─────────────────────────────────────────────────────
-export function refineItem(item: MolitItem, sgg_cd: string) {
-  const apt_nm = String(item.aptNm ?? "").trim();
-  if (!apt_nm) return null;
-  const apt_seq = item.aptSeq ? String(item.aptSeq).trim() || null : null;
-
-  const area = parseFloat(String(item.excluUseAr ?? "0").trim());
-  if (!area) return null;
-  const pyeong = Math.round(area * 0.4);
-
-  const price = parseInt(
-    String(item.dealAmount ?? "0").replace(/,|\s/g, ""),
-    10
-  );
-  if (!price) return null;
-
-  const deal_date = `${String(item.dealYear ?? "").padStart(4, "0")}-${pad2(item.dealMonth ?? "01")}-${pad2(item.dealDay ?? "01")}`;
-  const floor = item.floor ? parseInt(String(item.floor), 10) : null;
-  const build_year = item.buildYear ? parseInt(String(item.buildYear), 10) : null;
-  const umd_nm = item.umdNm ? String(item.umdNm).trim() || null : null;
-  const jibun = item.jibun ? String(item.jibun).trim() || null : null;
-  const road_nm = item.roadNm ? String(item.roadNm).trim() || null : null;
-  const dealing_gbn = String(item.dealingGbn ?? "중개거래").trim();
-  const canceled = String(item.cdealType ?? "").trim() === "O";
-  const cdeal_day = item.cdealDay ? String(item.cdealDay).trim() || null : null;
-
-  const raw_key = `${apt_nm}|${umd_nm ?? ""}|${jibun ?? ""}|${area.toFixed(2)}|${floor ?? ""}|${deal_date}|${price}`;
-
-  return { apt_nm, apt_seq, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year, dealing_gbn, canceled, cdeal_day, road_nm, raw_key };
 }
 
 // ─── 수집 ─────────────────────────────────────────────────────
@@ -94,14 +41,15 @@ async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo:
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const parsed = parser.parse(await res.text());
-  const resultCode = String(parsed?.response?.header?.resultCode ?? "000").trim();
-  if (resultCode === "22") {
+  // fast-xml-parser가 "000"/"00"/"0"→숫자 0, "03"→3 으로 변환하므로 정수로 정규화한다.
+  const rc = parseInt(String(parsed?.response?.header?.resultCode ?? "0"), 10);
+  if (rc === 22) {
     // HTTP 200이지만 일일 quota 소진 — consecutive429 카운터 증가로 조기 종료 트리거
     console.warn(`  [${sgg_cd}/${ym}] resultCode=22 — 일일 quota 소진`);
     throw new Error("429");
   }
-  if (resultCode !== "000" && resultCode !== "03") {
-    throw new Error(`API 오류 resultCode=${resultCode}`);
+  if (rc !== 0 && rc !== 3 && !Number.isNaN(rc)) {
+    throw new Error(`API 오류 resultCode=${rc}`);
   }
   return parsed;
 }

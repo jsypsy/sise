@@ -16,7 +16,7 @@ import { XMLParser } from "fast-xml-parser";
 import { AwsClient } from "aws4fetch";
 import { createServiceClient } from "../lib/supabase";
 import { REGIONS } from "../lib/regions";
-import { refineItem } from "./ingest";
+import { refineItem } from "../lib/refine";
 
 try { process.loadEnvFile(".env.local"); } catch { /* noop */ }
 
