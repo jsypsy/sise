@@ -108,14 +108,17 @@ async function fetchRegion(
         if (!res.ok) break;
 
         const parsed = parser.parse(await res.text());
-        const resultCode = String(parsed?.response?.header?.resultCode ?? "000").trim();
-        if (resultCode === "22") {
+        // fast-xml-parser가 "000"/"00"/"0"→숫자 0, "03"→3 으로 변환하므로 정수로 정규화한다.
+        // (헤더가 없으면 NaN → 정상으로 간주하고 body로 데이터 유무를 판정)
+        const rc = parseInt(String(parsed?.response?.header?.resultCode ?? "0"), 10);
+        if (rc === 22) {
           // 일일 quota 소진 — 이 지역의 남은 달 중단 (누적 데이터는 그대로 유지)
           console.warn(`  [${sgg_cd}] resultCode=22 — quota 소진. 배치 중단.`);
           return;
         }
-        if (resultCode !== "000" && resultCode !== "03") {
-          console.warn(`  [${sgg_cd}/${ym}] resultCode=${resultCode} — 건너뜀`);
+        if (rc !== 0 && rc !== 3 && !Number.isNaN(rc)) {
+          // 0=정상, 3=NODATA(정상), 그 외 양수=오류 → 이 달만 건너뜀
+          console.warn(`  [${sgg_cd}/${ym}] resultCode=${rc} — 건너뜀`);
           break;
         }
 
