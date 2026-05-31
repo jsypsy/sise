@@ -1,14 +1,19 @@
 /**
- * 과거 거래 원본은 저장하지 않고, 그룹(단지+시군구+평형)별 역대 최고가만
- * historical_peaks에 적재한다. 신고가 정확도 확보용 1회성 작업.
+ * 단지별 실거래 원본 전체를 Supabase Storage "raw" 버킷에 gzip JSON으로 적재한다.
+ *   raw/<sgg_cd>/<apt_nm>.json.gz  (단지 1개 = 파일 1개, 전 기간 거래 포함)
+ * 동시에 그룹(단지+시군구+평형)별 역대 최고가를 historical_peaks(DB)에 적재한다.
+ *   (시그널 계산은 SQL이 읽을 수 있어야 하므로 DB. raw는 화면 조회 전용.)
  *
- * 부가: 월별 집계(max/avg/cnt)를 Supabase Storage "trends" 버킷에
- *   sgg_cd/<apt_nm>.json 형태로 저장한다.
+ * 차트(월별 평균/최고가/거래량)는 클라이언트가 raw에서 직접 계산하므로 별도 집계 파일을 두지 않는다.
  *
  * 사용법:
- *   tsx scripts/fetch_peaks.ts --from=200601 --to=202412
+ *   tsx scripts/fetch_peaks.ts                      # 전 지역, 200601~현재월
+ *   tsx scripts/fetch_peaks.ts --shard=1 --shards=8 # 지역을 8등분한 1번째 샤드만
+ *   tsx scripts/fetch_peaks.ts --from=200601 --to=202605
  */
+import { gzipSync } from "node:zlib";
 import { XMLParser } from "fast-xml-parser";
+import { AwsClient } from "aws4fetch";
 import { createServiceClient } from "../lib/supabase";
 import { REGIONS } from "../lib/regions";
 import { refineItem } from "./ingest";
@@ -19,12 +24,26 @@ const parser = new XMLParser();
 
 type Peak = { apt_nm: string; sgg_cd: string; pyeong: number; peak_price: number; peak_date: string };
 
-/** 월별 집계 누산기 — キー: "apt_nm|sgg_cd|pyeong|ym" */
-type MonthlyAcc = { max_price: number; sum_price: number; count: number };
+/** raw 파일의 거래 1건 (키 축약으로 용량 절감) */
+type RawDeal = {
+  d: string;         // deal_date  YYYY-MM-DD
+  p: number;         // price       만원
+  a: number;         // area        전용면적 m²
+  py: number;        // pyeong      추정 평형
+  fl: number | null; // floor
+  g: string;         // dealing_gbn 중개거래/직거래
+  c: boolean;        // canceled    취소거래
+};
 
-/** Storage 업로드 단위 JSON */
-type TrendEntry = { ym: string; max: number; avg: number; cnt: number };
-type TrendJson  = { [pyeong: string]: TrendEntry[] };
+/** 단지 1개 = 파일 1개 */
+type RawComplex = {
+  apt_nm: string;
+  sgg_cd: string;
+  apt_seq: string | null;
+  umd_nm: string | null;
+  build_year: number | null;
+  deals: RawDeal[];
+};
 
 function parseArgs(): Record<string, string> {
   return Object.fromEntries(
@@ -40,6 +59,11 @@ function nextYm(ym: string): string {
   return month === 12
     ? `${year + 1}01`
     : `${year}${String(month + 1).padStart(2, "0")}`;
+}
+
+function currentYm(): string {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function monthRange(from: string, to: string): string[] {
@@ -64,7 +88,7 @@ async function fetchRegion(
   sgg_cd: string,
   months: string[],
   peaks: Map<string, Peak>,
-  monthlyAgg: Map<string, MonthlyAcc>,
+  complexes: Map<string, RawComplex>,
   molitKey: string,
 ): Promise<void> {
   for (const ym of months) {
@@ -95,7 +119,7 @@ async function fetchRegion(
           break;
         }
 
-        const body   = parsed?.response?.body;
+        const body = parsed?.response?.body;
         if (!body) break;
 
         if (pageNo === 1) totalCount = parseInt(String(body.totalCount ?? "0"), 10);
@@ -107,9 +131,25 @@ async function fetchRegion(
         const items = Array.isArray(rawItems) ? rawItems : [rawItems];
         for (const item of items) {
           const r = refineItem(item, sgg_cd);
-          if (!r || r.canceled) continue;
+          if (!r) continue;
 
-          // ── peaks 갱신 ──────────────────────────────────────────────
+          // ── raw 누적 (취소거래 포함 — 전부 보존, c 플래그로 구분) ──────────
+          const aptKey = `${r.apt_nm}|${r.sgg_cd}`;
+          let cx = complexes.get(aptKey);
+          if (!cx) {
+            cx = {
+              apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, apt_seq: r.apt_seq,
+              umd_nm: r.umd_nm, build_year: r.build_year, deals: [],
+            };
+            complexes.set(aptKey, cx);
+          }
+          cx.deals.push({
+            d: r.deal_date, p: r.price, a: r.area, py: r.pyeong,
+            fl: r.floor, g: r.dealing_gbn, c: r.canceled,
+          });
+
+          // ── peaks 갱신 (취소거래 제외) ───────────────────────────────────
+          if (r.canceled) continue;
           const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${r.pyeong}`;
           const existing = peaks.get(peakKey);
           if (!existing || r.price > existing.peak_price) {
@@ -117,17 +157,6 @@ async function fetchRegion(
               apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, pyeong: r.pyeong,
               peak_price: r.price, peak_date: r.deal_date,
             });
-          }
-
-          // ── 월별 집계 누산 ───────────────────────────────────────────
-          const aggKey = `${r.apt_nm}|${r.sgg_cd}|${r.pyeong}|${ym}`;
-          const acc    = monthlyAgg.get(aggKey);
-          if (!acc) {
-            monthlyAgg.set(aggKey, { max_price: r.price, sum_price: r.price, count: 1 });
-          } else {
-            if (r.price > acc.max_price) acc.max_price = r.price;
-            acc.sum_price += r.price;
-            acc.count     += 1;
           }
         }
 
@@ -149,32 +178,68 @@ async function main() {
   const molitKey = process.env.MOLIT_SERVICE_KEY;
   if (!molitKey) { console.error("MOLIT_SERVICE_KEY 없음"); process.exit(1); }
 
+  // R2 자격증명 — fail fast (수집 후 업로드에서 죽지 않도록 시작 시 검증)
+  const r2AccountId = process.env.R2_ACCOUNT_ID;
+  const r2Bucket    = process.env.R2_BUCKET;
+  const r2KeyId     = process.env.R2_ACCESS_KEY_ID;
+  const r2Secret    = process.env.R2_SECRET_ACCESS_KEY;
+  if (!r2AccountId || !r2Bucket || !r2KeyId || !r2Secret) {
+    console.error("R2 환경변수 누락: R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY 필요");
+    process.exit(1);
+  }
+  const r2 = new AwsClient({ accessKeyId: r2KeyId, secretAccessKey: r2Secret, service: "s3", region: "auto" });
+  const r2Endpoint = `https://${r2AccountId}.r2.cloudflarestorage.com/${r2Bucket}`;
+
+  // R2 preflight — 자격증명/버킷이 틀리면 수집(MOLIT quota) 전에 즉시 종료
+  {
+    const res = await r2.fetch(`${r2Endpoint}/__preflight__.txt`, {
+      method: "PUT", body: "ok", headers: { "Content-Type": "text/plain" },
+    });
+    if (!res.ok) {
+      console.error(`R2 preflight 실패: ${res.status} ${await res.text()}`);
+      console.error(`→ 자격증명 또는 버킷명(${r2Bucket}) 확인 필요. quota 소모 없이 종료.`);
+      process.exit(1);
+    }
+    console.log(`R2 preflight OK (버킷=${r2Bucket})`);
+  }
+
   const db   = createServiceClient();
   const args = parseArgs();
   const from = args.from ?? "200601";
-  const to   = args.to   ?? "202412";
+  const to   = args.to   ?? currentYm();
 
-  const targets = Object.values(REGIONS).flatMap(m => Object.keys(m));
-  const months  = monthRange(from, to);
+  let targets = Object.values(REGIONS).flatMap(m => Object.keys(m));
+
+  // 지역 샤딩: --shards=M 으로 전 지역을 M등분, --shard=N(1-based) 번째만 처리
+  const shards = parseInt(args.shards ?? "1", 10);
+  const shard  = parseInt(args.shard  ?? "0", 10);
+  if (shards > 1 && shard >= 1) {
+    const size = Math.ceil(targets.length / shards);
+    targets = targets.slice((shard - 1) * size, shard * size);
+    console.log(`샤드 ${shard}/${shards}: ${targets.length}개 지역`);
+  }
+
+  const months = monthRange(from, to);
 
   console.log(`수집 범위: ${from}~${to} (${months.length}개월, ${targets.length}개 지역)`);
-  console.log("거래 원본은 저장하지 않고 그룹별 최고가 + 월별 집계만 추적합니다.");
+  console.log("단지별 거래 원본 전체 + 그룹별 최고가를 수집합니다.");
 
-  const peaks      = new Map<string, Peak>();
-  const monthlyAgg = new Map<string, MonthlyAcc>();
+  const peaks     = new Map<string, Peak>();
+  const complexes = new Map<string, RawComplex>();
 
   const CONCURRENCY = 3;
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
     const batch = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(batch.map(sgg_cd => fetchRegion(sgg_cd, months, peaks, monthlyAgg, molitKey)));
+    await Promise.all(batch.map(sgg_cd => fetchRegion(sgg_cd, months, peaks, complexes, molitKey)));
     process.stdout.write(
-      `  ${Math.min(i + CONCURRENCY, targets.length)}/${targets.length} 지역 완료 (누적 그룹 ${peaks.size}개)\r`
+      `  ${Math.min(i + CONCURRENCY, targets.length)}/${targets.length} 지역 완료 (단지 ${complexes.size}개)\r`
     );
   }
 
-  console.log(`\n피크 수집 완료: ${peaks.size}개 그룹, 월별 집계 ${monthlyAgg.size}건`);
+  const totalDeals = [...complexes.values()].reduce((n, c) => n + c.deals.length, 0);
+  console.log(`\n수집 완료: 단지 ${complexes.size}개, 거래 ${totalDeals.toLocaleString()}건, 최고가 그룹 ${peaks.size}개`);
 
-  // ── historical_peaks 업서트 ─────────────────────────────────────────
+  // ── historical_peaks 업서트 (GREATEST 전략) ─────────────────────────
   console.log("historical_peaks 업서트 중...");
   const rows  = [...peaks.values()];
   const BATCH = 500;
@@ -191,84 +256,52 @@ async function main() {
   if (refreshErr) console.error("signals_mv 갱신 실패:", refreshErr.message);
   else console.log("signals_mv 완료.");
 
-  // ── Supabase Storage "trends" 버킷에 월별 집계 업로드 ───────────────
-  console.log("trends 버킷 준비 중...");
-  const { error: bucketErr } = await db.storage.createBucket("trends", { public: true });
-  if (bucketErr && !bucketErr.message.includes("already exists")) {
-    console.error("버킷 생성 실패:", bucketErr.message);
-  }
+  // ── Cloudflare R2에 단지별 원본 업로드 ──────────────────────────────
+  // gzip 바이트를 저장하되 Content-Encoding: gzip 메타데이터를 붙여, 클라이언트
+  // fetch가 자동 해제하도록 한다(별도 해제 코드 불필요). key는 .json 그대로.
+  console.log(`R2 업로드 시작: ${complexes.size}개 단지...`);
+  const tasks = [...complexes.values()];
+  const UPLOAD_CONCURRENCY = 8;
+  let uploadOk = 0, uploadFail = 0, gzBytes = 0;
 
-  // monthlyAgg를 (apt_nm, sgg_cd) 기준으로 그룹핑
-  // intermediateMap: "apt_nm|sgg_cd" → { [pyeong]: { [ym]: MonthlyAcc } }
-  type PyeongYmMap = Map<string, Map<string, MonthlyAcc>>;
-  const grouped = new Map<string, PyeongYmMap>();
-
-  for (const [key, acc] of monthlyAgg) {
-    const [apt_nm, sgg_cd, pyeongStr, ym] = key.split("|");
-    const aptKey = `${apt_nm}|${sgg_cd}`;
-
-    let pyeongMap = grouped.get(aptKey);
-    if (!pyeongMap) { pyeongMap = new Map(); grouped.set(aptKey, pyeongMap); }
-
-    let ymMap = pyeongMap.get(pyeongStr);
-    if (!ymMap) { ymMap = new Map(); pyeongMap.set(pyeongStr, ymMap); }
-
-    ymMap.set(ym, acc);
-  }
-
-  // 업로드할 파일 목록 빌드
-  type UploadTask = { path: string; body: string };
-  const uploadTasks: UploadTask[] = [];
-
-  for (const [aptKey, pyeongMap] of grouped) {
-    const pipeIdx = aptKey.indexOf("|");
-    const apt_nm  = aptKey.slice(0, pipeIdx);
-    const sgg_cd  = aptKey.slice(pipeIdx + 1);
-
-    const trendJson: TrendJson = {};
-    for (const [pyeongStr, ymMap] of pyeongMap) {
-      const entries: TrendEntry[] = [...ymMap.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([ym, acc]) => ({
-          ym,
-          max: acc.max_price,
-          avg: Math.round(acc.sum_price / acc.count),
-          cnt: acc.count,
-        }));
-      trendJson[pyeongStr] = entries;
-    }
-
-    uploadTasks.push({
-      path: `${sgg_cd}/${apt_nm}.json`,
-      body: JSON.stringify(trendJson),
-    });
-  }
-
-  console.log(`Storage 업로드 시작: ${uploadTasks.length}개 파일...`);
-
-  const UPLOAD_CONCURRENCY = 5;
-  let uploadOk = 0, uploadFail = 0;
-  for (let i = 0; i < uploadTasks.length; i += UPLOAD_CONCURRENCY) {
-    const batch = uploadTasks.slice(i, i + UPLOAD_CONCURRENCY);
+  for (let i = 0; i < tasks.length; i += UPLOAD_CONCURRENCY) {
+    const batch = tasks.slice(i, i + UPLOAD_CONCURRENCY);
     await Promise.all(
-      batch.map(async ({ path, body }) => {
-        const { error } = await db.storage
-          .from("trends")
-          .upload(path, body, { contentType: "application/json", upsert: true });
-        if (error) {
-          console.error(`  업로드 실패 [${path}]:`, error.message);
+      batch.map(async (cx) => {
+        cx.deals.sort((x, y) => x.d.localeCompare(y.d)); // 날짜순
+        const gz  = gzipSync(JSON.stringify(cx));
+        const key = `${cx.sgg_cd}/${encodeURIComponent(cx.apt_nm)}.json`;
+        try {
+          const res = await r2.fetch(`${r2Endpoint}/${key}`, {
+            method: "PUT",
+            body: gz,
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Encoding": "gzip",
+              "Cache-Control": "public, max-age=3600",
+            },
+          });
+          if (!res.ok) {
+            console.error(`  업로드 실패 [${key}]: ${res.status} ${await res.text()}`);
+            uploadFail++;
+          } else {
+            uploadOk++;
+            gzBytes += gz.byteLength;
+          }
+        } catch (err) {
+          console.error(`  업로드 예외 [${key}]:`, err);
           uploadFail++;
-        } else {
-          uploadOk++;
         }
       })
     );
     if ((i / UPLOAD_CONCURRENCY) % 100 === 0) {
-      process.stdout.write(`  업로드 진행: ${Math.min(i + UPLOAD_CONCURRENCY, uploadTasks.length)}/${uploadTasks.length}\r`);
+      process.stdout.write(`  업로드 진행: ${Math.min(i + UPLOAD_CONCURRENCY, tasks.length)}/${tasks.length}\r`);
     }
   }
 
-  console.log(`\nStorage 업로드 완료: 성공 ${uploadOk}개, 실패 ${uploadFail}개`);
+  const mb = (gzBytes / 1024 / 1024).toFixed(1);
+  console.log(`\nStorage 업로드 완료: 성공 ${uploadOk}개, 실패 ${uploadFail}개, gzip 합계 ${mb}MB`);
+  console.log(`[용량측정] 이 샤드 ${mb}MB → 전 지역 추정 시 ×(전체/이 샤드 지역수)로 환산`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
