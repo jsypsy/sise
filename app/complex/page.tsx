@@ -32,11 +32,14 @@ function ComplexInner() {
   useEffect(() => {
     const apt = searchParams.get("apt");
     const sgg = searchParams.get("sgg");
+    const q   = searchParams.get("q");
     if (apt && sgg) {
       setSido(CODE_TO_SIDO[sgg] ?? "");
       setSggCd(sgg);
       setQuery(apt);
       handleSelect(apt, sgg);
+    } else if (q) {
+      setQuery(q);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
