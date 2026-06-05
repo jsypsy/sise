@@ -68,6 +68,7 @@ function ComplexInner() {
       setShowSuggestions(false);
       return;
     }
+    if (selected && query === selected.apt_nm) return;
     const timer = setTimeout(async () => {
       const res = await fetch(
         `/api/search?q=${encodeURIComponent(query.trim())}&sgg=${sggCd}`
@@ -77,7 +78,7 @@ function ComplexInner() {
       setShowSuggestions(true);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, sggCd]);
+  }, [query, sggCd, selected]);
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
