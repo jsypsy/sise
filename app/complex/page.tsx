@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { won } from "@/lib/format";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME, CODE_TO_SIDO } from "@/lib/regions";
-import type { Signal } from "@/lib/types";
 import TrendChart from "./trend-chart";
 
 type SearchResult = {
@@ -16,6 +15,24 @@ type SearchResult = {
   peak_price: number;
 };
 
+type RawDeal = { d: string; p: number; py: number; fl: number | null; g: string; c: boolean };
+type DealRow = RawDeal & { delta_pct: number | null };
+
+function computeDeltas(deals: RawDeal[]): DealRow[] {
+  const sorted = [...deals].sort((a, b) => a.d.localeCompare(b.d));
+  const prevByPy = new Map<number, number>();
+  return sorted
+    .map((deal) => {
+      const prev = prevByPy.get(deal.py);
+      const delta = !deal.c && prev != null
+        ? Math.round((deal.p - prev) / prev * 100)
+        : null;
+      if (!deal.c) prevByPy.set(deal.py, deal.p);
+      return { ...deal, delta_pct: delta };
+    })
+    .sort((a, b) => b.d.localeCompare(a.d)); // 최신순
+}
+
 function ComplexInner() {
   const searchParams = useSearchParams();
   const [sido, setSido] = useState("");
@@ -24,7 +41,7 @@ function ComplexInner() {
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selected, setSelected] = useState<{ apt_nm: string; sgg_cd: string } | null>(null);
-  const [history, setHistory] = useState<Signal[]>([]);
+  const [deals, setDeals] = useState<DealRow[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -79,13 +96,24 @@ function ComplexInner() {
     setSelected({ apt_nm, sgg_cd });
     setShowSuggestions(false);
     setQuery(apt_nm);
-    setHistory([]);
+    setDeals([]);
     setLoading(true);
-    const res = await fetch(
-      `/api/search?apt=${encodeURIComponent(apt_nm)}&sgg=${encodeURIComponent(sgg_cd)}`
-    );
-    const data = await res.json();
-    setHistory(data);
+
+    const r2Url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+    if (r2Url) {
+      try {
+        const res = await fetch(
+          `${r2Url}/${sgg_cd}/${encodeURIComponent(apt_nm)}.json`
+        );
+        if (res.ok) {
+          const json: { deals: RawDeal[] } = await res.json();
+          setDeals(computeDeltas(json.deals));
+        }
+      } catch {
+        // R2 응답 없으면 빈 목록
+      }
+    }
+
     setLoading(false);
   }
 
@@ -95,7 +123,7 @@ function ComplexInner() {
     setQuery("");
     setSuggestions([]);
     setSelected(null);
-    setHistory([]);
+    setDeals([]);
   }
 
   function handleSggChange(next: string) {
@@ -103,7 +131,7 @@ function ComplexInner() {
     setQuery("");
     setSuggestions([]);
     setSelected(null);
-    setHistory([]);
+    setDeals([]);
   }
 
   const sggList = sido
@@ -179,12 +207,12 @@ function ComplexInner() {
           <TrendChart
             aptNm={selected.apt_nm}
             sggCd={selected.sgg_cd}
-            supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
+            r2Url={process.env.NEXT_PUBLIC_R2_PUBLIC_URL!}
           />
 
           <div className="flex items-center gap-2 mb-4">
             <button
-              onClick={() => { setSelected(null); setHistory([]); }}
+              onClick={() => { setSelected(null); setDeals([]); }}
               className="text-xs text-[var(--ink-soft)] hover:underline"
             >
               ← 다시 검색
@@ -193,9 +221,14 @@ function ComplexInner() {
             <span className="text-xs text-[var(--ink-soft)]">
               {CODE_TO_NAME[selected.sgg_cd] ?? selected.sgg_cd}
             </span>
+            {deals.length > 0 && (
+              <span className="text-xs text-[var(--ink-soft)]">
+                · 총 {deals.length.toLocaleString()}건
+              </span>
+            )}
           </div>
 
-          {history.length === 0 ? (
+          {deals.length === 0 ? (
             <p className="text-sm text-[var(--ink-soft)]">거래 이력이 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -205,50 +238,39 @@ function ComplexInner() {
                     <th className="py-2 pr-3 font-medium">거래일</th>
                     <th className="py-2 pr-3 font-medium">평형/층</th>
                     <th className="py-2 pr-3 font-medium text-right">거래가</th>
-                    <th className="py-2 pr-3 font-medium">시그널</th>
+                    <th className="py-2 pr-3 font-medium">유형</th>
                     <th className="py-2 font-medium text-right">증감</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((s) => (
+                  {deals.map((deal, i) => (
                     <tr
-                      key={s.id}
-                      className="border-b border-[var(--line)] hover:bg-[var(--paper-2)]"
+                      key={i}
+                      className={`border-b border-[var(--line)] hover:bg-[var(--paper-2)] ${deal.c ? "opacity-40" : ""}`}
                     >
-                      <td className="py-1.5 pr-3 text-xs">{s.deal_date}</td>
+                      <td className="py-1.5 pr-3 text-xs">{deal.d}</td>
                       <td className="py-1.5 pr-3 whitespace-nowrap">
-                        {s.pyeong}평{s.floor != null ? ` ${s.floor}층` : ""}
+                        {deal.py}평{deal.fl != null ? ` ${deal.fl}층` : ""}
                       </td>
                       <td className="py-1.5 pr-3 text-right font-medium whitespace-nowrap">
-                        <span className={
-                          s.is_high ? "text-[var(--red)]"
-                          : s.dealing_gbn === "직거래" ? "text-[var(--blue)]" : ""
-                        }>
-                          {won(s.price)}
+                        <span className={deal.g === "직거래" ? "text-[var(--blue)]" : ""}>
+                          {won(deal.p)}
                         </span>
                       </td>
-                      <td className="py-1.5 pr-3 whitespace-nowrap">
-                        {s.is_high && (
-                          <span className="bg-[var(--red)] text-white text-xs px-1.5 py-0.5 rounded mr-1">
-                            신고가
-                          </span>
-                        )}
-                        {s.is_rebound && (
-                          <span className="border border-[var(--gold)] text-[var(--gold)] text-xs px-1.5 py-0.5 rounded mr-1">
-                            반등
-                          </span>
-                        )}
-                        {s.dealing_gbn === "직거래" && (
-                          <span className="text-xs text-[var(--blue)]">직</span>
-                        )}
+                      <td className="py-1.5 pr-3 text-xs whitespace-nowrap">
+                        {deal.c
+                          ? <span className="text-[var(--ink-soft)]">취소</span>
+                          : deal.g === "직거래"
+                            ? <span className="text-[var(--blue)]">직</span>
+                            : null}
                       </td>
                       <td className="py-1.5 text-right text-xs">
-                        {s.delta_pct != null ? (
+                        {deal.delta_pct != null ? (
                           <span className={
-                            s.delta_pct > 0 ? "text-[var(--red)]"
-                            : s.delta_pct < 0 ? "text-[var(--blue)]" : ""
+                            deal.delta_pct > 0 ? "text-[var(--red)]"
+                            : deal.delta_pct < 0 ? "text-[var(--blue)]" : ""
                           }>
-                            {s.delta_pct > 0 ? "+" : ""}{s.delta_pct}%
+                            {deal.delta_pct > 0 ? "+" : ""}{deal.delta_pct}%
                           </span>
                         ) : "—"}
                       </td>

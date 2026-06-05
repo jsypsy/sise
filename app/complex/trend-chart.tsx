@@ -6,23 +6,44 @@ import {
 } from "recharts";
 import { won } from "@/lib/format";
 
-type TrendPoint = { ym: string; max: number; avg: number; cnt: number };
-type TrendData = { [pyeong: string]: TrendPoint[] };
+type RawDeal = { d: string; p: number; py: number; c: boolean };
+type TrendPoint = { ym: string; max: number; cnt: number };
+type TrendData = Record<string, TrendPoint[]>;
 
 interface TrendChartProps {
   aptNm: string;
   sggCd: string;
-  supabaseUrl: string;
+  r2Url: string;
 }
 
 const LINE_COLORS = ["#C7321F", "#2C557E", "#9A7B1F", "#4A7C59", "#7B4A7C"];
 
 function fmtYm(ym: string): string {
-  // YYYYMM → "YY.MM"
   return `${ym.slice(2, 4)}.${ym.slice(4, 6)}`;
 }
 
-export default function TrendChart({ aptNm, sggCd, supabaseUrl }: TrendChartProps) {
+function aggregate(deals: RawDeal[]): TrendData {
+  const map = new Map<string, number[]>();
+  for (const { d, p, py, c } of deals) {
+    if (c) continue;
+    const ym = d.slice(0, 7).replace("-", ""); // "YYYY-MM-DD" → "YYYYMM"
+    const key = `${py}|${ym}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(p);
+  }
+  const result: TrendData = {};
+  for (const [key, prices] of map) {
+    const [pyStr, ym] = key.split("|");
+    if (!result[pyStr]) result[pyStr] = [];
+    result[pyStr].push({ ym, max: Math.max(...prices), cnt: prices.length });
+  }
+  for (const py of Object.keys(result)) {
+    result[py].sort((a, b) => a.ym.localeCompare(b.ym));
+  }
+  return result;
+}
+
+export default function TrendChart({ aptNm, sggCd, r2Url }: TrendChartProps) {
   const [data, setData] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,45 +52,41 @@ export default function TrendChart({ aptNm, sggCd, supabaseUrl }: TrendChartProp
     setLoading(true);
     setData(null);
 
-    const url = `${supabaseUrl}/storage/v1/object/public/trends/${sggCd}/${encodeURIComponent(aptNm)}.json`;
+    const url = `${r2Url}/${sggCd}/${encodeURIComponent(aptNm)}.json`;
 
     fetch(url)
       .then((res) => {
         if (!res.ok) return null;
-        return res.json() as Promise<TrendData>;
+        return res.json() as Promise<{ deals: RawDeal[] }>;
       })
       .then((json) => {
         if (!cancelled) {
-          setData(json);
+          setData(json ? aggregate(json.deals) : null);
           setLoading(false);
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setData(null);
-          setLoading(false);
-        }
+        if (!cancelled) { setData(null); setLoading(false); }
       });
 
     return () => { cancelled = true; };
-  }, [aptNm, sggCd, supabaseUrl]);
+  }, [aptNm, sggCd, r2Url]);
 
-  if (loading) {
-    return <p className="text-xs text-[var(--ink-soft)] mb-4">추이 로딩 중...</p>;
-  }
-
+  if (loading) return <p className="text-xs text-[var(--ink-soft)] mb-4">추이 로딩 중...</p>;
   if (!data) return null;
 
-  const pyeongs = Object.keys(data).slice(0, 5);
+  // 거래량 많은 평형 순으로 최대 5개
+  const pyeongs = Object.keys(data)
+    .sort((a, b) => {
+      const ca = data[a].reduce((s, pt) => s + pt.cnt, 0);
+      const cb = data[b].reduce((s, pt) => s + pt.cnt, 0);
+      return cb - ca;
+    })
+    .slice(0, 5);
   if (pyeongs.length === 0) return null;
 
-  // 모든 pyeong의 ym을 합쳐 정렬
   const ymSet = new Set<string>();
-  for (const p of pyeongs) {
-    for (const pt of data[p]) {
-      ymSet.add(pt.ym);
-    }
-  }
+  for (const p of pyeongs) for (const pt of data[p]) ymSet.add(pt.ym);
   const yms = [...ymSet].sort();
 
   type Row = Record<string, number | string>;
@@ -77,9 +94,7 @@ export default function TrendChart({ aptNm, sggCd, supabaseUrl }: TrendChartProp
     const row: Row = { ym };
     for (const p of pyeongs) {
       const pt = data[p].find((d) => d.ym === ym);
-      if (pt !== undefined) {
-        row[`${p}평_max`] = pt.max;
-      }
+      if (pt) row[`${p}평`] = pt.max;
     }
     return row;
   });
@@ -115,11 +130,11 @@ export default function TrendChart({ aptNm, sggCd, supabaseUrl }: TrendChartProp
             <Line
               key={p}
               type="monotone"
-              dataKey={`${p}평_max`}
+              dataKey={`${p}평`}
               name={`${p}평`}
               stroke={LINE_COLORS[i % LINE_COLORS.length]}
               strokeWidth={2}
-              dot={{ r: 3 }}
+              dot={false}
               connectNulls
             />
           ))}
