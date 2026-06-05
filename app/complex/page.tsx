@@ -220,7 +220,7 @@ function ComplexInner() {
 
       {selected && !loading && (
         <div>
-          <TrendChart deals={rawDeals} />
+          <TrendChart deals={rawDeals} selectedPy={filterPy} />
 
           <div className="flex items-center gap-2 mb-3">
             <button
