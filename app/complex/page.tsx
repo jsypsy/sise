@@ -52,6 +52,7 @@ function ComplexInner() {
 
   const [sido, setSido] = useState("");
   const [sggCd, setSggCd] = useState("");
+  const [umdNm, setUmdNm] = useState("");
   const [aptNm, setAptNm] = useState("");
 
   const [aptList, setAptList] = useState<SearchResult[]>([]);
@@ -74,8 +75,9 @@ function ComplexInner() {
 
   // sggCd 변경 → 시군구 전체 단지 목록
   useEffect(() => {
-    if (!sggCd) { setAptList([]); setAptNm(""); resetDeals(); return; }
+    if (!sggCd) { setAptList([]); setUmdNm(""); setAptNm(""); resetDeals(); return; }
     setAptList([]);
+    setUmdNm("");
     setAptNm("");
     resetDeals();
     fetch(`/api/search?sgg=${sggCd}`)
@@ -113,17 +115,38 @@ function ComplexInner() {
     setLoading(false);
   }
 
+  function handleUmdChange(next: string) {
+    setUmdNm(next);
+    setAptNm("");
+    resetDeals();
+  }
+
   function handleAptChange(name: string) {
     if (!name) { setAptNm(""); resetDeals(); return; }
-    const result = aptList.find((r) => r.apt_nm === name);
+    const result = visibleApts.find((r) => r.apt_nm === name);
     if (result) handleSelectApt(result);
-    else setAptNm(name);
   }
 
   function handleFilterPy(py: number | null) {
     setFilterPy(py);
     setPage(1);
   }
+
+  // aptList에서 동 목록 파생 (클라이언트 필터링)
+  const umdList = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const r of aptList) {
+      if (r.umd_nm && !seen.has(r.umd_nm)) { seen.add(r.umd_nm); result.push(r.umd_nm); }
+    }
+    return result.sort((a, b) => a.localeCompare(b, "ko"));
+  }, [aptList]);
+
+  // 선택된 동으로 단지 필터링
+  const visibleApts = useMemo(
+    () => (umdNm ? aptList.filter((r) => r.umd_nm === umdNm) : aptList),
+    [aptList, umdNm]
+  );
 
   const pyeongOptions = useMemo(() => {
     const count = new Map<number, number>();
@@ -149,8 +172,8 @@ function ComplexInner() {
     <div>
       <h2 className="text-lg font-semibold mb-4">단지 조회</h2>
 
-      {/* 3단계 드롭다운 */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
+      {/* 4단계 드롭다운 */}
+      <div className="grid grid-cols-2 gap-2 mb-6">
         <select value={sido} onChange={(e) => { setSido(e.target.value); setSggCd(""); }} className={SELECT_CLS}>
           <option value="">시도 선택</option>
           {SIDO_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -160,21 +183,27 @@ function ComplexInner() {
           <option value="">시군구 선택</option>
           {sggList.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
         </select>
-      </div>
 
-      <div className="mb-6">
+        <select
+          value={umdNm}
+          onChange={(e) => handleUmdChange(e.target.value)}
+          disabled={!sggCd || aptList.length === 0}
+          className={SELECT_CLS}
+        >
+          <option value="">{sggCd && aptList.length === 0 ? "로딩 중…" : "동 선택 (전체)"}</option>
+          {umdList.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+
         <select
           value={aptNm}
           onChange={(e) => handleAptChange(e.target.value)}
-          disabled={!sggCd}
+          disabled={!sggCd || aptList.length === 0}
           className={SELECT_CLS}
         >
-          <option value="">
-            {sggCd && aptList.length === 0 ? "로딩 중…" : "단지 선택"}
-          </option>
-          {aptList.map((r) => (
+          <option value="">단지 선택</option>
+          {visibleApts.map((r) => (
             <option key={`${r.apt_nm}|${r.sgg_cd}`} value={r.apt_nm}>
-              {r.apt_nm}{r.umd_nm ? ` · ${r.umd_nm}` : ""}
+              {r.apt_nm}
             </option>
           ))}
         </select>
