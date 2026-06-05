@@ -44,10 +44,8 @@ function ComplexInner() {
 
   const [sido, setSido] = useState("");
   const [sggCd, setSggCd] = useState("");
-  const [umdNm, setUmdNm] = useState("");
   const [aptNm, setAptNm] = useState("");
 
-  const [umdList, setUmdList] = useState<string[]>([]);
   const [aptList, setAptList] = useState<SearchResult[]>([]);
 
   const [selected, setSelected] = useState<{ apt_nm: string; sgg_cd: string } | null>(null);
@@ -66,33 +64,18 @@ function ComplexInner() {
     setPage(1);
   }
 
-  // sggCd 변경 → 동 목록
+  // sggCd 변경 → 시군구 전체 단지 목록
   useEffect(() => {
-    if (!sggCd) { setUmdList([]); setUmdNm(""); setAptList([]); setAptNm(""); resetDeals(); return; }
-    setUmdList([]);
-    setUmdNm("");
+    if (!sggCd) { setAptList([]); setAptNm(""); resetDeals(); return; }
     setAptList([]);
     setAptNm("");
     resetDeals();
     fetch(`/api/search?sgg=${sggCd}`)
       .then((r) => r.json())
-      .then((d: string[]) => setUmdList(d))
-      .catch(() => setUmdList([]));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sggCd]);
-
-  // umdNm 변경 → 단지 목록
-  useEffect(() => {
-    if (!sggCd || !umdNm) { setAptList([]); setAptNm(""); resetDeals(); return; }
-    setAptList([]);
-    setAptNm("");
-    resetDeals();
-    fetch(`/api/search?sgg=${sggCd}&umd=${encodeURIComponent(umdNm)}`)
-      .then((r) => r.json())
       .then((d: SearchResult[]) => setAptList(d))
       .catch(() => setAptList([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [umdNm, sggCd]);
+  }, [sggCd]);
 
   async function handleSelectApt(result: SearchResult) {
     setAptNm(result.apt_nm);
@@ -126,6 +109,7 @@ function ComplexInner() {
     if (!name) { setAptNm(""); resetDeals(); return; }
     const result = aptList.find((r) => r.apt_nm === name);
     if (result) handleSelectApt(result);
+    else setAptNm(name);
   }
 
   function handleFilterPy(py: number | null) {
@@ -157,8 +141,8 @@ function ComplexInner() {
     <div>
       <h2 className="text-lg font-semibold mb-4">단지 조회</h2>
 
-      {/* 4단계 드롭다운 */}
-      <div className="grid grid-cols-2 gap-2 mb-6">
+      {/* 3단계 드롭다운 */}
+      <div className="grid grid-cols-2 gap-2 mb-2">
         <select value={sido} onChange={(e) => { setSido(e.target.value); setSggCd(""); }} className={SELECT_CLS}>
           <option value="">시도 선택</option>
           {SIDO_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -168,27 +152,21 @@ function ComplexInner() {
           <option value="">시군구 선택</option>
           {sggList.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
         </select>
+      </div>
 
-        <select
-          value={umdNm}
-          onChange={(e) => setUmdNm(e.target.value)}
-          disabled={!sggCd || umdList.length === 0}
-          className={SELECT_CLS}
-        >
-          <option value="">{sggCd && umdList.length === 0 ? "로딩 중…" : "동 선택"}</option>
-          {umdList.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-
+      <div className="mb-6">
         <select
           value={aptNm}
           onChange={(e) => handleAptChange(e.target.value)}
-          disabled={!umdNm || aptList.length === 0}
+          disabled={!sggCd}
           className={SELECT_CLS}
         >
-          <option value="">{umdNm && aptList.length === 0 ? "로딩 중…" : "단지 선택"}</option>
+          <option value="">
+            {sggCd && aptList.length === 0 ? "로딩 중…" : "단지 선택"}
+          </option>
           {aptList.map((r) => (
-            <option key={r.apt_nm} value={r.apt_nm}>
-              {r.apt_nm}
+            <option key={`${r.apt_nm}|${r.sgg_cd}`} value={r.apt_nm}>
+              {r.apt_nm}{r.umd_nm ? ` · ${r.umd_nm}` : ""}
             </option>
           ))}
         </select>

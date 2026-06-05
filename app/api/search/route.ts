@@ -31,31 +31,17 @@ export async function GET(req: NextRequest) {
   const umd = req.nextUrl.searchParams.get("umd");
   const q   = req.nextUrl.searchParams.get("q")?.trim() ?? "";
 
-  // 동 목록: sgg만 있을 때
-  if (sgg && !umd && !q) {
-    const { data } = await supabase
-      .from("transactions")
-      .select("umd_nm")
-      .eq("sgg_cd", sgg)
-      .eq("canceled", false)
-      .not("umd_nm", "is", null)
-      .limit(5000);
-    const umds = [...new Set((data ?? []).map((r) => r.umd_nm as string))].sort((a, b) =>
-      a.localeCompare(b, "ko")
-    );
-    return NextResponse.json(umds);
-  }
-
-  // 단지 목록: sgg + umd
-  if (sgg && umd) {
-    const { data } = await supabase
+  // 단지 목록: sgg만 있을 때 → 해당 시군구 전체 단지
+  if (sgg && !q) {
+    let qb = supabase
       .from("transactions")
       .select("apt_nm, sgg_cd, umd_nm, price, deal_date")
       .eq("sgg_cd", sgg)
-      .eq("umd_nm", umd)
       .eq("canceled", false)
       .order("deal_date", { ascending: false })
-      .limit(2000);
+      .limit(5000);
+    if (umd) qb = qb.eq("umd_nm", umd);
+    const { data } = await qb;
     const apts = groupApts(data ?? []).sort((a, b) => a.apt_nm.localeCompare(b.apt_nm, "ko"));
     return NextResponse.json(apts);
   }
