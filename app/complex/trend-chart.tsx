@@ -1,32 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { won } from "@/lib/format";
 
-type RawDeal = { d: string; p: number; py: number; c: boolean };
+type RawDeal = { d: string; p: number; py: number; fl: number | null; g: string; c: boolean };
 type TrendPoint = { ym: string; max: number; cnt: number };
 type TrendData = Record<string, TrendPoint[]>;
 
-interface TrendChartProps {
-  aptNm: string;
-  sggCd: string;
-  r2Url: string;
-}
-
+type Period = "1년" | "3년" | "5년" | "전체";
+const PERIODS: Period[] = ["1년", "3년", "5년", "전체"];
 const LINE_COLORS = ["#C7321F", "#2C557E", "#9A7B1F", "#4A7C59", "#7B4A7C"];
 
 function fmtYm(ym: string): string {
   return `${ym.slice(2, 4)}.${ym.slice(4, 6)}`;
 }
 
-function aggregate(deals: RawDeal[]): TrendData {
+function getStartYm(period: Period): string | null {
+  if (period === "전체") return null;
+  const months = period === "1년" ? 12 : period === "3년" ? 36 : 60;
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function aggregate(deals: RawDeal[], startYm: string | null): TrendData {
   const map = new Map<string, number[]>();
   for (const { d, p, py, c } of deals) {
     if (c) continue;
-    const ym = d.slice(0, 7).replace("-", ""); // "YYYY-MM-DD" → "YYYYMM"
+    const ym = d.slice(0, 7).replace("-", "");
+    if (startYm && ym < startYm) continue;
     const key = `${py}|${ym}`;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(p);
@@ -43,39 +48,14 @@ function aggregate(deals: RawDeal[]): TrendData {
   return result;
 }
 
-export default function TrendChart({ aptNm, sggCd, r2Url }: TrendChartProps) {
-  const [data, setData] = useState<TrendData | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function TrendChart({ deals }: { deals: RawDeal[] }) {
+  const [period, setPeriod] = useState<Period>("전체");
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setData(null);
+  if (deals.length === 0) return null;
 
-    const url = `${r2Url}/${sggCd}/${encodeURIComponent(aptNm)}.json`;
+  const startYm = getStartYm(period);
+  const data = aggregate(deals, startYm);
 
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) return null;
-        return res.json() as Promise<{ deals: RawDeal[] }>;
-      })
-      .then((json) => {
-        if (!cancelled) {
-          setData(json ? aggregate(json.deals) : null);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) { setData(null); setLoading(false); }
-      });
-
-    return () => { cancelled = true; };
-  }, [aptNm, sggCd, r2Url]);
-
-  if (loading) return <p className="text-xs text-[var(--ink-soft)] mb-4">추이 로딩 중...</p>;
-  if (!data) return null;
-
-  // 거래량 많은 평형 순으로 최대 5개
   const pyeongs = Object.keys(data)
     .sort((a, b) => {
       const ca = data[a].reduce((s, pt) => s + pt.cnt, 0);
@@ -83,6 +63,7 @@ export default function TrendChart({ aptNm, sggCd, r2Url }: TrendChartProps) {
       return cb - ca;
     })
     .slice(0, 5);
+
   if (pyeongs.length === 0) return null;
 
   const ymSet = new Set<string>();
@@ -103,7 +84,24 @@ export default function TrendChart({ aptNm, sggCd, r2Url }: TrendChartProps) {
 
   return (
     <div className="mb-6">
-      <p className="text-xs text-[var(--ink-soft)] mb-2">월별 최고가 추이 (만원)</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-[var(--ink-soft)]">월별 최고가 추이 (만원)</p>
+        <div className="flex gap-1">
+          {PERIODS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`text-xs px-2 py-0.5 rounded ${
+                period === p
+                  ? "bg-[var(--ink)] text-[var(--paper)]"
+                  : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
           <XAxis
