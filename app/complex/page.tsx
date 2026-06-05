@@ -16,11 +16,18 @@ type SearchResult = {
 };
 
 type RawDeal = { d: string; p: number; py: number; fl: number | null; g: string; c: boolean };
-type DealRow = RawDeal & { delta_pct: number | null };
+type DealRow = RawDeal & { delta_pct: number | null; is_high: boolean };
 
 const PAGE_SIZE = 20;
 
 function computeDeltas(deals: RawDeal[]): DealRow[] {
+  // 평형별 최고가 (취소 제외)
+  const peakByPy = new Map<number, number>();
+  for (const d of deals) {
+    if (d.c) continue;
+    peakByPy.set(d.py, Math.max(peakByPy.get(d.py) ?? 0, d.p));
+  }
+
   const sorted = [...deals].sort((a, b) => a.d.localeCompare(b.d));
   const prevByPy = new Map<number, number>();
   return sorted
@@ -30,7 +37,8 @@ function computeDeltas(deals: RawDeal[]): DealRow[] {
         ? Math.round((deal.p - prev) / prev * 100)
         : null;
       if (!deal.c) prevByPy.set(deal.py, deal.p);
-      return { ...deal, delta_pct: delta };
+      const is_high = !deal.c && deal.p === peakByPy.get(deal.py);
+      return { ...deal, delta_pct: delta, is_high };
     })
     .sort((a, b) => b.d.localeCompare(a.d));
 }
@@ -256,7 +264,12 @@ function ComplexInner() {
                           {deal.py}평{deal.fl != null ? ` ${deal.fl}층` : ""}
                         </td>
                         <td className="py-1.5 pr-3 text-right font-medium whitespace-nowrap">
-                          <span className={deal.g === "직거래" ? "text-[var(--blue)]" : ""}>
+                          {deal.is_high && (
+                            <span className="inline-block text-[10px] font-bold text-[var(--red)] border border-[var(--red)] rounded px-1 py-0 mr-1 leading-tight align-middle">
+                              최고가
+                            </span>
+                          )}
+                          <span className={deal.g === "직거래" ? "text-[var(--blue)]" : deal.is_high ? "text-[var(--red)]" : ""}>
                             {won(deal.p)}
                           </span>
                         </td>
