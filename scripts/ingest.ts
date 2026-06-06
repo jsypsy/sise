@@ -17,9 +17,25 @@ function parseArgs(): Record<string, string> {
   );
 }
 
-function currentYmKst(): string {
+// KST 기준 오늘 날짜(YYYY-MM-DD) — 신규 거래의 first_seen(등록일)로 사용.
+// Actions runner는 UTC이므로 DB의 current_date를 쓰면 KST와 하루 어긋난다.
+function todayDateKst(): string {
+  return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+}
+
+// KST 기준 당월부터 과거로 months개월의 계약년월(YYYYMM) 목록.
+// 신고 기한(계약 후 30일) 탓에 오늘 등록되는 거래의 계약월이 전월·전전월일 수
+// 있어, 최근 몇 달을 매일 다시 긁어 지연 신고분을 따라잡는다.
+function recentYmsKst(months: number): string[] {
   const kst = new Date(Date.now() + 9 * 3600_000);
-  return kst.toISOString().slice(0, 7).replace("-", "");
+  const y = kst.getUTCFullYear();
+  const m = kst.getUTCMonth(); // KST-shift된 타임스탬프라 UTC 게터가 KST 연·월
+  const out: string[] = [];
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(y, m - i, 1));
+    out.push(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
 }
 
 // ─── 수집 ─────────────────────────────────────────────────────
@@ -58,6 +74,7 @@ async function ingestSggYm(
   serviceKey: string,
   sgg_cd: string,
   ym: string,
+  firstSeen: string,
   db: ReturnType<typeof createServiceClient>
 ) {
   let pageNo = 1;
@@ -77,7 +94,10 @@ async function ingestSggYm(
     if (!rawItems) break;
 
     const items: MolitItem[] = Array.isArray(rawItems) ? rawItems : [rawItems];
-    const rows = items.map(i => refineItem(i, sgg_cd)).filter((r): r is NonNullable<typeof r> => r != null);
+    const rows = items
+      .map(i => refineItem(i, sgg_cd))
+      .filter((r): r is NonNullable<typeof r> => r != null)
+      .map(r => ({ ...r, first_seen: firstSeen }));
 
     if (rows.length) {
       const { error } = await db
@@ -102,40 +122,49 @@ async function main() {
 
   const db = createServiceClient();
   const args = parseArgs();
-  const ym = args.ym ?? currentYmKst();
 
   const targets = args.sgg
     ? [args.sgg]
     : Object.values(REGIONS).flatMap(m => Object.keys(m));
 
-  console.log(`수집 시작: ${targets.length}개 지역, ${ym}`);
+  // --ym=YYYYMM 이면 그 달만(수동 backfill). 없으면 당월부터 최근 N개월(기본 3).
+  const firstSeen = todayDateKst();
+  const months = args.months ? Math.max(1, parseInt(args.months, 10)) : 3;
+  const yms = args.ym ? [args.ym] : recentYmsKst(months);
+
+  console.log(`수집 시작: ${targets.length}개 지역 × ${yms.length}개월 [${yms.join(", ")}], first_seen=${firstSeen}`);
 
   let consecutive429 = 0;
-  for (const sgg_cd of targets) {
-    try {
-      await ingestSggYm(molitKey, sgg_cd, ym, db);
-      consecutive429 = 0;
-    } catch (err) {
-      console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
-      if (String(err).includes("429")) {
-        consecutive429++;
-        if (consecutive429 >= 5) {
-          console.error("연속 5회 429 — 일일 quota 소진. 수집 조기 종료.");
-          break;
-        }
-      } else {
+  outer:
+  for (const ym of yms) {
+    for (const sgg_cd of targets) {
+      try {
+        await ingestSggYm(molitKey, sgg_cd, ym, firstSeen, db);
         consecutive429 = 0;
+      } catch (err) {
+        console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
+        if (String(err).includes("429")) {
+          consecutive429++;
+          if (consecutive429 >= 5) {
+            console.error("연속 5회 429 — 일일 quota 소진. 수집 조기 종료.");
+            break outer;
+          }
+        } else {
+          consecutive429 = 0;
+        }
       }
+      await new Promise(r => setTimeout(r, 300)); // 429 방지
     }
-    await new Promise(r => setTimeout(r, 300)); // 429 방지
   }
 
   console.log("수집 완료");
 
-  console.log("historical_peaks 동기화 중...");
-  const { error: syncErr } = await db.rpc("sync_peaks_from_transactions");
-  if (syncErr) console.error("peaks 동기화 실패:", syncErr.message);
-  else console.log("peaks 동기화 완료");
+  // ※ sync_peaks_from_transactions()는 호출하지 않는다.
+  // 현재 윈도우 거래의 가격을 historical_peaks에 먼저 써넣으면, signals_mv의
+  // prev_peak = GREATEST(윈도우-자기제외, hp)에 '자기 가격'이 포함되어 진짜
+  // 신고가가 is_high=false로 억눌린다(self-inclusion). hp의 전고점 baseline은
+  // archive_expired_transactions(떠나는 거래)와 fetch_peaks(R2 전체이력)만으로
+  // 유지한다.
 
   console.log("만료 거래 아카이빙 중...");
   const { error: archiveErr } = await db.rpc("archive_expired_transactions");

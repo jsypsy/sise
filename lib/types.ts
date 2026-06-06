@@ -9,6 +9,7 @@ export type Tx = {
   pyeong: number;
   price: number;
   deal_date: string;
+  first_seen: string;       // 등록일(우리 수집에 처음 나타난 날, KST)
   floor: number | null;
   build_year: number | null;
   dealing_gbn: string;

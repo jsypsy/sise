@@ -67,7 +67,7 @@ export default function TopPage() {
       let highQ = supabase
         .from("signals_mv")
         .select("*")
-        .gte("deal_date", since)
+        .gte("first_seen", since)
         .eq("dealing_gbn", "중개거래")
         .eq("is_high", true)
         .order("price", { ascending: false })
@@ -76,7 +76,7 @@ export default function TopPage() {
       let rebQ = supabase
         .from("signals_mv")
         .select("*")
-        .gte("deal_date", since)
+        .gte("first_seen", since)
         .eq("dealing_gbn", "중개거래")
         .eq("is_rebound", true)
         .order("price", { ascending: false })
@@ -157,7 +157,7 @@ export default function TopPage() {
         </section>
       </div>
 
-      <p className="text-xs text-[var(--ink-soft)] mt-5">최근 7일 · 중개거래 기준</p>
+      <p className="text-xs text-[var(--ink-soft)] mt-5">최근 7일 신규 등록 · 중개거래 기준</p>
     </div>
   );
 }

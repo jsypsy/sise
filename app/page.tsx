@@ -9,6 +9,7 @@ import { CODE_TO_NAME } from "@/lib/regions";
 import MainSearch from "./main-search";
 
 async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
+  // 최근 7일 '등록(신고)된' 거래 기준 — 계약일(deal_date)이 아니라 first_seen.
   const since = new Date();
   since.setDate(since.getDate() - 7);
   const sinceStr = since.toISOString().slice(0, 10);
@@ -17,7 +18,7 @@ async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
     supabase
       .from("signals_mv")
       .select("*")
-      .gte("deal_date", sinceStr)
+      .gte("first_seen", sinceStr)
       .eq("dealing_gbn", "중개거래")
       .eq("is_high", true)
       .order("price", { ascending: false })
@@ -25,7 +26,7 @@ async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
     supabase
       .from("signals_mv")
       .select("*")
-      .gte("deal_date", sinceStr)
+      .gte("first_seen", sinceStr)
       .eq("dealing_gbn", "중개거래")
       .eq("is_rebound", true)
       .order("price", { ascending: false })
@@ -97,7 +98,7 @@ export default async function HomePage() {
       </div>
 
       <p className="text-xs text-[var(--ink-soft)] mt-5">
-        최근 7일 · 중개거래 기준 ·{" "}
+        최근 7일 신규 등록 · 중개거래 기준 ·{" "}
         <Link href="/top" className="hover:underline">
           지역별로 보기 →
         </Link>

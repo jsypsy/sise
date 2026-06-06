@@ -4,21 +4,22 @@ import { won } from "./format";
 import { CODE_TO_NAME } from "./regions";
 
 export async function buildDigestText(): Promise<{ text: string; date: string }> {
+  // 다이제스트 = '오늘 신규 등록된' 시그널 → 계약일이 아니라 first_seen(등록일) 기준.
   const { data: dateRow } = await supabase
     .from("signals_mv")
-    .select("deal_date")
-    .order("deal_date", { ascending: false })
+    .select("first_seen")
+    .order("first_seen", { ascending: false })
     .limit(1)
     .single();
 
   if (!dateRow) return { text: "데이터가 없습니다.", date: "" };
 
-  const date = dateRow.deal_date as string;
+  const date = dateRow.first_seen as string;
 
   const { data } = await supabase
     .from("signals_mv")
     .select("*")
-    .eq("deal_date", date)
+    .eq("first_seen", date)
     .eq("dealing_gbn", "중개거래")
     .order("price", { ascending: false });
 
