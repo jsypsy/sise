@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { won } from "@/lib/format";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME } from "@/lib/regions";
@@ -50,6 +50,8 @@ function ComplexInner() {
   const searchParams = useSearchParams();
   const qHint = searchParams.get("q") ?? "";
 
+  const pendingApt = useRef("");
+
   const [sido, setSido] = useState("");
   const [sggCd, setSggCd] = useState("");
   const [umdNm, setUmdNm] = useState("");
@@ -73,6 +75,22 @@ function ComplexInner() {
     setPage(1);
   }
 
+  // URL 파라미터(apt, sgg)로 진입한 경우 드롭다운 자동 선택
+  useEffect(() => {
+    const aptParam = searchParams.get("apt") ?? "";
+    const sggParam = searchParams.get("sgg") ?? "";
+    if (!sggParam) return;
+    for (const [s, sggs] of Object.entries(REGIONS)) {
+      if (sggParam in sggs) {
+        pendingApt.current = aptParam;
+        setSido(s);
+        setSggCd(sggParam);
+        break;
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // sggCd 변경 → 시군구 전체 단지 목록
   useEffect(() => {
     if (!sggCd) { setAptList([]); setUmdNm(""); setAptNm(""); resetDeals(); return; }
@@ -82,7 +100,14 @@ function ComplexInner() {
     resetDeals();
     fetch(`/api/search?sgg=${sggCd}`)
       .then((r) => r.json())
-      .then((d: SearchResult[]) => setAptList(d))
+      .then((d: SearchResult[]) => {
+        setAptList(d);
+        if (pendingApt.current) {
+          const match = d.find((r) => r.apt_nm === pendingApt.current);
+          pendingApt.current = "";
+          if (match) handleSelectApt(match);
+        }
+      })
       .catch(() => setAptList([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sggCd]);
