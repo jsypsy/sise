@@ -23,7 +23,10 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
     .eq("dealing_gbn", "중개거래")
     .order("price", { ascending: false });
 
-  const signals = (data as Signal[]) ?? [];
+  const allSignals = (data as Signal[]) ?? [];
+  const signals = allSignals.filter((s) =>
+    s.sgg_cd.startsWith("11") || s.sgg_cd.startsWith("28") || s.sgg_cd.startsWith("41")
+  );
   const highSignals = signals.filter((s) => s.is_high).slice(0, 15);
   const rebSignals = signals
     .filter((s) => s.is_rebound && !s.is_high)
