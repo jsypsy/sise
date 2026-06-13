@@ -42,7 +42,8 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
   if (highSignals.length > 0) {
     text += "\n■ 신고가 TOP\n";
     for (const s of highSignals) {
-      text += `  ${s.apt_nm} ${s.pyeong}평 ${won(s.price)}`;
+      const loc = `${CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd}${s.umd_nm ? ` ${s.umd_nm}` : ""}`;
+      text += `  ${s.apt_nm} (${loc}) ${s.pyeong}평 ${won(s.price)}`;
       if (s.prev_peak) text += ` (직전최고 ${won(s.prev_peak)})`;
       text += "\n";
     }
@@ -51,7 +52,8 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
   if (rebSignals.length > 0) {
     text += "\n■ 반등 (전고점 회복 진행)\n";
     for (const s of rebSignals) {
-      text += `  ${s.apt_nm} ${s.pyeong}평 ${won(s.price)}`;
+      const loc = `${CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd}${s.umd_nm ? ` ${s.umd_nm}` : ""}`;
+      text += `  ${s.apt_nm} (${loc}) ${s.pyeong}평 ${won(s.price)}`;
       if (s.recovery_rate != null) text += ` · 회복률 ${s.recovery_rate}%`;
       text += "\n";
     }
