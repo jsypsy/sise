@@ -1,106 +1,83 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { toBlob } from "html-to-image";
+import type { Digest, DigestRow } from "@/lib/digest";
 
-type Section = "high" | "rebound" | null;
-
-const PRICE_RE = /\d+억(?:\s[\d,]+)?|[\d,]+만/;
-
-function StyledLine({ line, section }: { line: string; section: Section }) {
-  const trimmed = line.trimStart();
-  if (!trimmed) return <div className="h-1" />;
-
-  if (trimmed.startsWith("총 ")) {
-    return <div className="text-xs text-[var(--ink-soft)]">{trimmed}</div>;
-  }
-  if (trimmed.startsWith("ⓘ")) {
-    return <div className="text-xs text-[var(--ink-soft)] mt-2">{trimmed}</div>;
-  }
-
-  if (trimmed.startsWith("■")) {
-    const isHigh = trimmed.includes("신고가");
-    return (
-      <div className={`font-semibold text-sm mt-3 ${isHigh ? "text-red-600" : "text-blue-600"}`}>
-        {trimmed}
-      </div>
-    );
-  }
-
-  if (section === "high") {
-    const m = trimmed.match(
-      new RegExp(`^(.+? \\([^)]+\\))\\s+(\\d+평)\\s+(${PRICE_RE.source})(?:\\s+\\(직전\\s+([^)]+)\\))?$`)
-    );
-    if (m) {
-      const [, nameAndLoc, pyeong, price, prev] = m;
-      return (
-        <div className="text-sm pl-2 leading-snug">
-          {nameAndLoc}{" "}
-          <span className="text-[var(--ink-soft)]">{pyeong}</span>{" "}
-          <span className="text-red-600 font-semibold">{price}</span>
-          {prev && (
-            <span className="text-[var(--ink-soft)] text-xs"> (직전 {prev})</span>
-          )}
-        </div>
-      );
-    }
-  }
-
-  if (section === "rebound") {
-    const m = trimmed.match(
-      new RegExp(`^(.+? \\([^)]+\\))\\s+(\\d+평)\\s+(${PRICE_RE.source})(?:\\s+·\\s+회복률\\s+([\\d.]+%))?$`)
-    );
-    if (m) {
-      const [, nameAndLoc, pyeong, price, rate] = m;
-      let badge: ReactNode = null;
-      if (rate) {
-        const val = parseFloat(rate);
-        const cls =
-          val >= 100 ? "bg-red-100 text-red-700" :
-          val >= 99  ? "bg-orange-100 text-orange-700" :
-          val >= 95  ? "bg-yellow-100 text-yellow-700" :
-                       "bg-gray-100 text-[var(--ink-soft)]";
-        badge = (
-          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cls}`}>
-            회복률 {rate}
-          </span>
-        );
-      }
-      return (
-        <div className="text-sm pl-2 leading-snug">
-          {nameAndLoc}{" "}
-          <span className="text-[var(--ink-soft)]">{pyeong}</span>{" "}
-          <span className="font-medium">{price}</span>
-          {badge && <> · {badge}</>}
-        </div>
-      );
-    }
-  }
-
-  return <div className="text-sm pl-2">{trimmed}</div>;
+// 회복률 → [배경, 글자] 색. 신고가/상승=빨강 관습 유지, 회복 단계는 빨강→주황→노랑.
+function rateColor(rate: number): [string, string] {
+  if (rate >= 100) return ["var(--red-bg)", "var(--red)"];
+  if (rate >= 99) return ["#FCE7D6", "#B45309"];
+  if (rate >= 95) return ["#FBF1CC", "#92750F"];
+  return ["var(--paper-2)", "var(--ink-soft)"];
 }
 
-function renderDigest(text: string): ReactNode {
-  // 카드 헤더가 제목·날짜를 보여주므로 "[아파트 …]" 첫 줄은 카드 본문에서 생략한다.
-  const lines = text.split("\n").filter((l) => !l.trimStart().startsWith("[아파트"));
-  let section: Section = null;
-  return lines.map((line, i) => {
-    if (line.includes("■ 신고가")) section = "high";
-    else if (line.includes("■ 반등")) section = "rebound";
-    return <StyledLine key={i} line={line} section={section} />;
-  });
+function Chip({ text, bg, fg }: { text: string; bg: string; fg: string }) {
+  return (
+    <span
+      className="text-[11px] font-semibold rounded px-1.5 py-0.5 leading-none whitespace-nowrap"
+      style={{ background: bg, color: fg }}
+    >
+      {text}
+    </span>
+  );
+}
+
+function SectionHeader({ color, label, count }: { color: string; label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2 mt-3.5 mb-1.5">
+      <span className="w-1 h-[18px] rounded-sm" style={{ background: color }} />
+      <span className="text-[15px] font-bold" style={{ color }}>
+        {label}
+      </span>
+      <span className="text-xs font-semibold text-[var(--ink-soft)]">{count}건</span>
+    </div>
+  );
+}
+
+function HighRow({ r, first }: { r: DigestRow; first: boolean }) {
+  return (
+    <div className={`flex items-center py-1.5 ${first ? "" : "border-t border-[var(--line)]"}`}>
+      <div className="flex flex-col flex-1 min-w-0 pr-2">
+        <span className="text-sm font-bold text-[var(--ink)] leading-tight truncate">{r.name}</span>
+        <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
+          {r.loc} · {r.pyeong}평
+        </span>
+      </div>
+      <div className="flex flex-col items-end shrink-0">
+        <span className="text-[15px] font-bold text-[var(--red)] leading-tight">{r.price}</span>
+        {r.deltaEok != null && (
+          <span className="text-[11px] font-semibold text-[var(--red)] mt-0.5">
+            ▲ {r.deltaEok.toFixed(1)}억
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RebRow({ r, first }: { r: DigestRow; first: boolean }) {
+  const [bg, fg] = r.recovery != null ? rateColor(r.recovery) : ["var(--paper-2)", "var(--ink-soft)"];
+  return (
+    <div className={`flex items-center py-1.5 ${first ? "" : "border-t border-[var(--line)]"}`}>
+      <div className="flex flex-col flex-1 min-w-0 pr-2">
+        <span className="text-sm font-bold text-[var(--ink)] leading-tight truncate">{r.name}</span>
+        <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
+          {r.loc} · {r.pyeong}평
+        </span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {r.recovery != null && <Chip text={`회복 ${r.recovery}%`} bg={bg} fg={fg} />}
+        <span className="text-[15px] font-bold text-[var(--ink)] text-right w-[88px]">{r.price}</span>
+      </div>
+    </div>
+  );
 }
 
 type Toast = { kind: "ok" | "err"; msg: string } | null;
 
-export default function DigestClient({
-  text,
-  date,
-}: {
-  text: string;
-  date: string;
-}) {
+export default function DigestClient({ digest }: { digest: Digest }) {
+  const { date, total, highs, rebs, text } = digest;
   const cardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -170,6 +147,15 @@ export default function DigestClient({
     }
   }
 
+  if (total === 0) {
+    return (
+      <div>
+        <h2 className="text-lg font-semibold mb-3">다이제스트</h2>
+        <p className="text-sm text-[var(--ink-soft)]">데이터가 없습니다.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-baseline gap-3 mb-1">
@@ -183,25 +169,58 @@ export default function DigestClient({
       {/* 공유 카드 (이 영역 그대로 PNG로 캡처) */}
       <div
         ref={cardRef}
-        className="bg-[var(--paper)] border border-[var(--line)] rounded-lg px-5 py-4 max-w-md"
+        className="bg-[var(--paper)] rounded-lg px-5 py-5 max-w-md"
       >
-        <div className="flex items-end justify-between border-b-2 border-double border-[var(--line-strong)] pb-2 mb-3">
-          <div>
-            <div
-              className="text-2xl font-bold leading-none tracking-tight"
+        {/* 헤더 */}
+        <div className="flex items-end justify-between border-b-2 border-[var(--line-strong)] pb-2.5">
+          <div className="flex flex-col">
+            <span
+              className="text-3xl font-bold leading-none tracking-tight"
               style={{ fontFamily: "var(--font-gowun), serif" }}
             >
               시세
-            </div>
-            <div className="text-[10px] text-[var(--ink-soft)] tracking-widest uppercase mt-1">
-              아파트 매매 실거래 시그널
-            </div>
+            </span>
+            <span className="text-[10px] font-semibold text-[var(--ink-soft)] tracking-[0.2em] uppercase mt-1.5">
+              APT 실거래 시그널
+            </span>
           </div>
-          {date && (
-            <div className="text-xs text-[var(--ink-soft)] tabular-nums">{date}</div>
-          )}
+          {date && <span className="text-[13px] font-semibold text-[var(--ink-soft)] tabular-nums">{date}</span>}
         </div>
-        <div className="leading-relaxed">{renderDigest(text)}</div>
+
+        {/* 요약 칩 */}
+        <div className="flex gap-1.5 mt-3">
+          <Chip text={`총 ${total}건`} bg="var(--paper-2)" fg="var(--ink-soft)" />
+          <Chip text={`신고가 ${highs.length}`} bg="var(--red-bg)" fg="var(--red)" />
+          <Chip text={`반등 ${rebs.length}`} bg="#E4ECF4" fg="var(--blue)" />
+        </div>
+
+        {/* 신고가 */}
+        {highs.length > 0 && (
+          <>
+            <SectionHeader color="var(--red)" label="신고가" count={highs.length} />
+            {highs.map((r, i) => (
+              <HighRow key={`h${i}`} r={r} first={i === 0} />
+            ))}
+          </>
+        )}
+
+        {/* 반등 */}
+        {rebs.length > 0 && (
+          <>
+            <SectionHeader color="var(--blue)" label="반등 · 전고점 회복" count={rebs.length} />
+            {rebs.map((r, i) => (
+              <RebRow key={`r${i}`} r={r} first={i === 0} />
+            ))}
+          </>
+        )}
+
+        {/* 푸터: 출처·면책 + 핸들 (이미지가 떠돌아도 출처가 남도록) */}
+        <div className="flex items-center justify-between mt-3.5 pt-2 border-t border-[var(--line)]">
+          <span className="text-[10px] text-[var(--ink-soft)]">
+            국토부 실거래가 기반 · 직거래/취소 제외 · 정부 공식 아님
+          </span>
+          <span className="text-[10px] font-bold text-[var(--ink)]">sise</span>
+        </div>
       </div>
 
       {/* 액션 */}
@@ -220,9 +239,7 @@ export default function DigestClient({
           {copied ? "복사됨 ✓" : "텍스트 복사"}
         </button>
         {toast && (
-          <span
-            className={`text-xs ${toast.kind === "ok" ? "text-[var(--ink-soft)]" : "text-red-600"}`}
-          >
+          <span className={`text-xs ${toast.kind === "ok" ? "text-[var(--ink-soft)]" : "text-red-600"}`}>
             {toast.msg}
           </span>
         )}

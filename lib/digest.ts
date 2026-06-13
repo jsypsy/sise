@@ -15,7 +15,25 @@ function guOnly(sgg_cd: string): string {
   return full.includes(" ") ? full.split(" ").slice(1).join(" ") : full;
 }
 
-export async function buildDigestText(): Promise<{ text: string; date: string }> {
+// 카드 렌더용 구조화 행. 텍스트 파싱 없이 화면이 바로 그린다.
+export type DigestRow = {
+  name: string;
+  loc: string;
+  pyeong: number;
+  price: string; // 만원 → "29억 5,000"
+  deltaEok: number | null; // 신고가: 직전 전고점 대비 상승폭(억). 없으면 null
+  recovery: number | null; // 반등: 회복률(%). 없으면 null
+};
+
+export type Digest = {
+  date: string;
+  total: number;
+  highs: DigestRow[];
+  rebs: DigestRow[];
+  text: string; // 텍스트 복사 / API용
+};
+
+export async function buildDigest(): Promise<Digest> {
   // 다이제스트 = '오늘 신규 등록된' 시그널 → 계약일이 아니라 first_seen(등록일) 기준.
   const { data: dateRow } = await supabase
     .from("signals_mv")
@@ -24,7 +42,9 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
     .limit(1)
     .single();
 
-  if (!dateRow) return { text: "데이터가 없습니다.", date: "" };
+  if (!dateRow) {
+    return { date: "", total: 0, highs: [], rebs: [], text: "데이터가 없습니다." };
+  }
 
   const date = dateRow.first_seen as string;
 
@@ -45,14 +65,34 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
     .sort((a, b) => (b.recovery_rate ?? 0) - (a.recovery_rate ?? 0))
     .slice(0, 15);
 
+  const loc = (s: Signal) => `${guOnly(s.sgg_cd)}${s.umd_nm ? ` ${s.umd_nm}` : ""}`;
+
+  const highs: DigestRow[] = highSignals.map((s) => ({
+    name: s.apt_nm,
+    loc: loc(s),
+    pyeong: s.pyeong,
+    price: won(s.price),
+    deltaEok: s.prev_peak != null ? Math.round((s.price - s.prev_peak) / 100) / 100 : null,
+    recovery: null,
+  }));
+
+  const rebs: DigestRow[] = rebSignals.map((s) => ({
+    name: s.apt_nm,
+    loc: loc(s),
+    pyeong: s.pyeong,
+    price: won(s.price),
+    deltaEok: null,
+    recovery: s.recovery_rate ?? null,
+  }));
+
+  // 텍스트(카페 복붙·API)는 기존 포맷 그대로 유지.
   let text = `[아파트 실거래 시그널] ${date}\n`;
   text += `총 ${signals.length}건 / 신고가 ${highSignals.length}건 / 반등 ${rebSignals.length}건\n`;
 
   if (highSignals.length > 0) {
     text += "\n■ 신고가 TOP\n";
     for (const s of highSignals) {
-      const loc = `${guOnly(s.sgg_cd)}${s.umd_nm ? ` ${s.umd_nm}` : ""}`;
-      text += `  ${s.apt_nm} (${loc}) ${s.pyeong}평 ${won(s.price)}`;
+      text += `  ${s.apt_nm} (${loc(s)}) ${s.pyeong}평 ${won(s.price)}`;
       if (s.prev_peak) text += ` (직전 ${wonShort(s.prev_peak)})`;
       text += "\n";
     }
@@ -61,8 +101,7 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
   if (rebSignals.length > 0) {
     text += "\n■ 반등 (전고점 회복 진행)\n";
     for (const s of rebSignals) {
-      const loc = `${guOnly(s.sgg_cd)}${s.umd_nm ? ` ${s.umd_nm}` : ""}`;
-      text += `  ${s.apt_nm} (${loc}) ${s.pyeong}평 ${won(s.price)}`;
+      text += `  ${s.apt_nm} (${loc(s)}) ${s.pyeong}평 ${won(s.price)}`;
       if (s.recovery_rate != null) text += ` · 회복률 ${s.recovery_rate}%`;
       text += "\n";
     }
@@ -70,5 +109,11 @@ export async function buildDigestText(): Promise<{ text: string; date: string }>
 
   text += "\nⓘ 국토부 실거래가 기반 · 직거래/취소거래 제외";
 
+  return { date, total: signals.length, highs, rebs, text };
+}
+
+// API·기존 호출부 호환용 얇은 래퍼.
+export async function buildDigestText(): Promise<{ text: string; date: string }> {
+  const { text, date } = await buildDigest();
   return { text, date };
 }
