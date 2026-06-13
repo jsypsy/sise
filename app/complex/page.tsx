@@ -58,6 +58,8 @@ function ComplexInner() {
   const [aptNm, setAptNm] = useState("");
 
   const [aptList, setAptList] = useState<SearchResult[]>([]);
+  const [qResults, setQResults] = useState<SearchResult[]>([]);
+  const [qLoading, setQLoading] = useState(false);
 
   const [selected, setSelected] = useState<{ apt_nm: string; sgg_cd: string } | null>(null);
   const [rawDeals, setRawDeals] = useState<RawDeal[]>([]);
@@ -90,6 +92,18 @@ function ComplexInner() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 메인 검색창 q 파라미터 → 결과 목록 표시
+  useEffect(() => {
+    if (!qHint || searchParams.get("sgg")) return;
+    setQLoading(true);
+    fetch(`/api/search?q=${encodeURIComponent(qHint)}`)
+      .then((r) => r.json())
+      .then((d: SearchResult[]) => setQResults(d))
+      .catch(() => setQResults([]))
+      .finally(() => setQLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qHint]);
 
   // sggCd 변경 → 시군구 전체 단지 목록
   useEffect(() => {
@@ -138,6 +152,18 @@ function ComplexInner() {
     }
 
     setLoading(false);
+  }
+
+  function handleQResultClick(result: SearchResult) {
+    setQResults([]);
+    for (const [s, sggs] of Object.entries(REGIONS)) {
+      if (result.sgg_cd in sggs) {
+        pendingApt.current = result.apt_nm;
+        setSido(s);
+        setSggCd(result.sgg_cd);
+        break;
+      }
+    }
   }
 
   function handleUmdChange(next: string) {
@@ -234,11 +260,32 @@ function ComplexInner() {
         </select>
       </div>
 
-      {/* 메인 검색창에서 넘어온 경우 힌트 */}
+      {/* 메인 검색창 q 파라미터 → 결과 목록 */}
       {qHint && !selected && (
-        <p className="text-xs text-[var(--ink-soft)] mb-4">
-          &ldquo;{qHint}&rdquo; · 시도 → 시군구 → 동 순서로 선택하세요
-        </p>
+        <div className="mb-6">
+          {qLoading ? (
+            <p className="text-sm text-[var(--ink-soft)]">검색 중…</p>
+          ) : qResults.length > 0 ? (
+            <div className="border border-[var(--line)] rounded overflow-hidden">
+              {qResults.map((r) => (
+                <button
+                  key={`${r.apt_nm}|${r.sgg_cd}`}
+                  onClick={() => handleQResultClick(r)}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--paper-2)] border-b border-[var(--line)] last:border-0"
+                >
+                  <span className="font-medium">{r.apt_nm}</span>
+                  <span className="text-xs text-[var(--ink-soft)] ml-2">
+                    {CODE_TO_NAME[r.sgg_cd] ?? r.sgg_cd}{r.umd_nm ? ` · ${r.umd_nm}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--ink-soft)]">
+              &ldquo;{qHint}&rdquo; 검색 결과가 없습니다.
+            </p>
+          )}
+        </div>
       )}
 
       {loading && <p className="text-sm text-[var(--ink-soft)]">로딩 중…</p>}
