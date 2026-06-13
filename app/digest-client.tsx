@@ -163,29 +163,22 @@ export default function DigestClient({ digest }: { digest: Digest }) {
         카톡·단톡방에 <b>이미지로 공유</b>하면 색·정렬이 그대로 보입니다. 텍스트 복붙도 가능합니다.
       </p>
 
-      {/* '공유될 카드' 임을 명확히 — 페이지 상단 사이트 헤더와 구분되는 액자 */}
-      <div className="text-[11px] text-[var(--ink-soft)] mb-1.5 flex items-center gap-1">
-        <span>↓ 이 카드가 이미지로 공유됩니다</span>
-      </div>
+      <div className="text-[11px] text-[var(--ink-soft)] mb-1.5">공유 미리보기</div>
 
       {/* 공유 카드 (이 영역 그대로 PNG로 캡처) */}
       <div
         ref={cardRef}
         className="bg-[var(--paper)] rounded-lg px-5 py-5 max-w-md border border-[var(--line)] shadow-md"
       >
-        {/* 헤더 */}
+        {/* 헤더 — 사이트 마스트헤드(시세)와 중복되지 않도록 카드 제목은 '무엇'을 표기.
+            브랜드는 하단 sise 핸들로. */}
         <div className="flex items-end justify-between border-b-2 border-[var(--line-strong)] pb-2.5">
-          <div className="flex flex-col">
-            <span
-              className="text-3xl font-bold leading-none tracking-tight"
-              style={{ fontFamily: "var(--font-gowun), serif" }}
-            >
-              시세
-            </span>
-            <span className="text-[10px] font-semibold text-[var(--ink-soft)] tracking-[0.2em] uppercase mt-1.5">
-              APT 실거래 시그널
-            </span>
-          </div>
+          <span
+            className="text-xl font-bold leading-none tracking-tight"
+            style={{ fontFamily: "var(--font-gowun), serif" }}
+          >
+            아파트 실거래 시그널
+          </span>
           {date && <span className="text-[13px] font-semibold text-[var(--ink-soft)] tabular-nums">{date}</span>}
         </div>
 
