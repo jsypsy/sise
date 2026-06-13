@@ -75,9 +75,10 @@ function monthRange(from: string, to: string): string[] {
 
 async function fetchWithRetry(url: string, sgg_cd: string, ym: string, attempt = 0): Promise<Response> {
   const res = await fetch(url);
-  if (res.status === 429 && attempt < 4) {
-    const wait = 2000 * Math.pow(2, attempt);
-    console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/4)`);
+  if (res.status === 429 && attempt < 5) {
+    // 429: 첫 번째는 60s, 이후 2배씩 (60/120/240/480/960s)
+    const wait = 60000 * Math.pow(2, attempt);
+    console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/5)`);
     await new Promise(r => setTimeout(r, wait));
     return fetchWithRetry(url, sgg_cd, ym, attempt + 1);
   }
@@ -167,10 +168,8 @@ async function fetchRegion(
         pageNo++;
       } while (fetched < totalCount);
 
-      // 데이터 있는 달만 delay — 빈 달은 바로 다음 달로
-      if (totalCount > 0) {
-        await new Promise(r => setTimeout(r, 150));
-      }
+      // 모든 달에 delay — 빈 달도 포함해 burst 방지
+      await new Promise(r => setTimeout(r, 200));
     } catch (err) {
       console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
     }
