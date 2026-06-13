@@ -2,13 +2,12 @@ name: fetch-peaks-schedule
 
 # 전국 단지별 실거래 원본을 지역 8등분(샤드)으로 나눠 하루 1샤드씩 수집한다.
 # 각 샤드는 자기 지역의 2006~현재 전 기간을 끝내므로 단지 파일이 한 번에 완성된다(merge 불필요).
+# 매일 shard=(epoch일 mod 8)+1 로 순환 → 모든 지역이 8일 주기로 재적재되어 지연 등록분을 따라잡는다.
 # 일일 quota(10,000콜): 1샤드 ≈ 31지역 × ~244개월 ≈ 9,000콜 + 매일 ingest ~250콜 < 10,000.
 # 실패 시 GitHub이 레포 주인에게 자동 이메일을 보낸다(Vercel 배포 실패 알림과 동일, 설정 불필요).
 on:
   schedule:
-    - cron: "0 22 31 5 *"    # UTC 2026-05-31 22:00 = KST 06-01 07:00  → 샤드 1
-    - cron: "0 22 1-7 6 *"   # UTC 2026-06-01~07 22:00 = KST 06-02~08 07:00 → 샤드 2~8
-    - cron: "0 22 8-12 6 *"  # UTC 2026-06-08~12 22:00 = KST 06-09~13 07:00 → 재적재 샤드 1~5
+    - cron: "0 22 * * *"   # 매일 UTC 22:00 = KST 07:00 (그날 샤드는 아래 step에서 결정)
   workflow_dispatch:
     inputs:
       shard:
@@ -34,25 +33,11 @@ jobs:
         run: |
           SHARD="${{ inputs.shard }}"
           if [ -z "$SHARD" ]; then
-            DATE=$(date -u +%Y-%m-%d)
-            case $DATE in
-              "2026-05-31") SHARD=1 ;;
-              "2026-06-01") SHARD=2 ;;
-              "2026-06-02") SHARD=3 ;;
-              "2026-06-03") SHARD=4 ;;
-              "2026-06-04") SHARD=5 ;;
-              "2026-06-05") SHARD=6 ;;
-              "2026-06-06") SHARD=7 ;;
-              "2026-06-07") SHARD=8 ;;
-              "2026-06-08") SHARD=1 ;;
-              "2026-06-09") SHARD=2 ;;
-              "2026-06-10") SHARD=3 ;;
-              "2026-06-11") SHARD=4 ;;
-              "2026-06-12") SHARD=5 ;;
-              *) echo "오늘($DATE)은 예정된 샤드 없음. 종료."; exit 0 ;;
-            esac
+            # epoch 일수 기준 8일 주기 순환 → 끊김 없이 매 지역을 8일마다 재적재
+            DAYS=$(( $(date -u +%s) / 86400 ))
+            SHARD=$(( DAYS % 8 + 1 ))
           fi
-          echo "샤드 $SHARD / 8 실행"
+          echo "샤드 $SHARD / 8 실행 (UTC $(date -u +%F))"
           npx tsx scripts/fetch_peaks.ts --shard=$SHARD --shards=8
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
