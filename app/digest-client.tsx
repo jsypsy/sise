@@ -158,18 +158,20 @@ export default function DigestClient({ digest }: { digest: Digest }) {
 
   return (
     <div>
-      <div className="flex items-baseline gap-3 mb-1">
-        <h2 className="text-lg font-semibold">다이제스트</h2>
-        {date && <span className="text-sm text-[var(--ink-soft)]">{date}</span>}
-      </div>
+      <h2 className="text-lg font-semibold mb-1">다이제스트</h2>
       <p className="text-xs text-[var(--ink-soft)] mb-3">
         카톡·단톡방에 <b>이미지로 공유</b>하면 색·정렬이 그대로 보입니다. 텍스트 복붙도 가능합니다.
       </p>
 
+      {/* '공유될 카드' 임을 명확히 — 페이지 상단 사이트 헤더와 구분되는 액자 */}
+      <div className="text-[11px] text-[var(--ink-soft)] mb-1.5 flex items-center gap-1">
+        <span>↓ 이 카드가 이미지로 공유됩니다</span>
+      </div>
+
       {/* 공유 카드 (이 영역 그대로 PNG로 캡처) */}
       <div
         ref={cardRef}
-        className="bg-[var(--paper)] rounded-lg px-5 py-5 max-w-md"
+        className="bg-[var(--paper)] rounded-lg px-5 py-5 max-w-md border border-[var(--line)] shadow-md"
       >
         {/* 헤더 */}
         <div className="flex items-end justify-between border-b-2 border-[var(--line-strong)] pb-2.5">
