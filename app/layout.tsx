@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Gowun_Batang } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Nav from "./nav";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
@@ -65,6 +66,7 @@ export default function RootLayout({
           본 서비스는 국토교통부 실거래가 공개시스템 데이터를 가공한 것으로 정부 공식 서비스가 아니며,
           정보의 정확성·완전성을 보장하지 않습니다. 평형은 추정치이며 투자 판단의 책임은 이용자에게 있습니다.
         </footer>
+        <Analytics />
       </body>
     </html>
   );
