@@ -58,6 +58,7 @@ function ComplexInner() {
   const [aptNm, setAptNm] = useState("");
 
   const [aptList, setAptList] = useState<SearchResult[]>([]);
+  const [aptLoading, setAptLoading] = useState(false);
   const [qResults, setQResults] = useState<SearchResult[]>([]);
   const [qLoading, setQLoading] = useState(false);
 
@@ -107,8 +108,9 @@ function ComplexInner() {
 
   // sggCd 변경 → 시군구 전체 단지 목록
   useEffect(() => {
-    if (!sggCd) { setAptList([]); setUmdNm(""); setAptNm(""); resetDeals(); return; }
+    if (!sggCd) { setAptList([]); setAptLoading(false); setUmdNm(""); setAptNm(""); resetDeals(); return; }
     setAptList([]);
+    setAptLoading(true);
     setUmdNm("");
     setAptNm("");
     resetDeals();
@@ -122,7 +124,8 @@ function ComplexInner() {
           if (match) handleSelectApt(match);
         }
       })
-      .catch(() => setAptList([]));
+      .catch(() => setAptList([]))
+      .finally(() => setAptLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sggCd]);
 
@@ -242,7 +245,7 @@ function ComplexInner() {
           disabled={!sggCd || aptList.length === 0}
           className={SELECT_CLS}
         >
-          <option value="">{sggCd && aptList.length === 0 ? "로딩 중…" : "동 선택 (전체)"}</option>
+          <option value="">{aptLoading ? "로딩 중…" : aptList.length === 0 ? "단지 없음" : "동 선택 (전체)"}</option>
           {umdList.map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
 
@@ -252,7 +255,7 @@ function ComplexInner() {
           disabled={!sggCd || aptList.length === 0}
           className={SELECT_CLS}
         >
-          <option value="">단지 선택</option>
+          <option value="">{aptLoading ? "로딩 중…" : aptList.length === 0 ? "단지 없음" : "단지 선택"}</option>
           {visibleApts.map((r) => (
             <option key={`${r.apt_nm}|${r.sgg_cd}`} value={r.apt_nm}>
               {r.apt_nm}
