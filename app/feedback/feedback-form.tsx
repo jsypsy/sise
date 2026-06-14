@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export default function FeedbackForm() {
   const [message, setMessage] = useState("");
   const [contact, setContact] = useState("");
+  const [hp, setHp] = useState(""); // 허니팟(사람은 비움, 봇은 채움)
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [err, setErr] = useState("");
+  const mountedAt = useRef(Date.now());
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,6 +26,8 @@ export default function FeedbackForm() {
         body: JSON.stringify({
           message,
           contact,
+          hp,
+          elapsed: Date.now() - mountedAt.current,
           path: typeof window !== "undefined" ? window.location.pathname : "",
         }),
       });
@@ -57,6 +61,14 @@ export default function FeedbackForm() {
 
   return (
     <form onSubmit={submit} className="space-y-3 max-w-xl">
+      {/* 허니팟 — 사람 눈엔 안 보이고, 봇이 채우면 서버에서 차단 */}
+      <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", height: 1, width: 1, overflow: "hidden" }}>
+        <label>
+          회사명
+          <input type="text" tabIndex={-1} autoComplete="off" value={hp} onChange={(e) => setHp(e.target.value)} />
+        </label>
+      </div>
+
       <div>
         <label className="block text-sm font-medium mb-1">의견·제보 내용</label>
         <textarea
