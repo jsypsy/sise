@@ -1,7 +1,14 @@
 export const revalidate = 86400;
 
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  description:
+    "오늘의 아파트 신고가·반등 시그널과 최근 7일 TOP. 국토부 실거래가 기반, 단지 검색.",
+  alternates: { canonical: "/" },
+};
 import { supabase } from "@/lib/supabase";
 import type { Signal } from "@/lib/types";
 import { won } from "@/lib/format";

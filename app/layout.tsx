@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Gowun_Batang } from "next/font/google";
 import "./globals.css";
 import Nav from "./nav";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 const gowun = Gowun_Batang({
   weight: ["400", "700"],
@@ -10,9 +11,31 @@ const gowun = Gowun_Batang({
   display: "swap",
 });
 
+const DEFAULT_TITLE = "시세 — 아파트 실거래 시그널";
+
 export const metadata: Metadata = {
-  title: "시세 — 아파트 실거래 시그널",
-  description: "국토부 실거래가 기반 매일 신고가·반등 시그널",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: DEFAULT_TITLE,
+    template: "%s · 시세",
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "ko_KR",
+    url: "/",
+    title: DEFAULT_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: DEFAULT_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
