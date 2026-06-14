@@ -49,7 +49,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="4. 방문 분석">
-        서비스 개선을 위해 Vercel Web Analytics 등 분석 도구를 사용할 수 있습니다. 해당 도구는 개인을
+        서비스 개선을 위해 방문 통계 분석 도구를 사용할 수 있습니다. 해당 도구는 개인을
         식별하지 않는 집계 통계(방문 수, 페이지 조회 등)만을 수집합니다.
       </Section>
 
@@ -60,8 +60,8 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="6. 처리 위탁 / 제3자 서비스">
-        서비스 운영을 위해 다음의 외부 서비스를 이용합니다: 호스팅 및 분석(Vercel), 데이터베이스(Supabase),
-        파일 저장(Cloudflare R2), 광고(Google AdSense, 도입 시). 각 서비스는 자체 개인정보처리방침을 따릅니다.
+        서비스 운영을 위해 호스팅·분석 제공업체, 데이터베이스(Supabase), 파일 저장(Cloudflare R2),
+        광고(Google AdSense, 도입 시) 등 외부 서비스를 이용합니다. 각 서비스는 자체 개인정보처리방침을 따릅니다.
       </Section>
 
       <Section title="7. 이용자의 권리">
