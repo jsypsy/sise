@@ -143,7 +143,7 @@ export default function DigestClient({ digest }: { digest: Digest }) {
       // 빠르고 깨짐 없이. 이미지엔 OS 한글 폰트가 쓰여 글리프 누락(□)을 방지한다.
       const blob = await toBlob(node, {
         pixelRatio: 2,
-        backgroundColor: "#FAF7F0",
+        backgroundColor: "#FFFFFF",
         cacheBust: true,
         skipFonts: true,
       });

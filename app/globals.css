@@ -2,11 +2,11 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #FAF7F0;
-  --paper-2: #F3EEE3;
+  --paper: #FFFFFF;
+  --paper-2: #F2F3F5;
   --ink: #1A1814;
-  --ink-soft: #5C564C;
-  --line: #D8D0BE;
+  --ink-soft: #5B6066;
+  --line: #E6E7EA;
   --line-strong: #1A1814;
   --red: #C7321F;
   --red-bg: #F8E7E2;
