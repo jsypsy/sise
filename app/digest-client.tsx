@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import type { Digest, DigestRow } from "@/lib/digest";
+import { complexHref } from "@/lib/complex";
 
 // 회복률 → [배경, 글자] 색. 신고가/상승=빨강 관습 유지, 회복 단계는 빨강→주황→노랑.
 function rateColor(rate: number): [string, string] {
@@ -41,7 +42,7 @@ function HighRow({ r, first }: { r: DigestRow; first: boolean }) {
     <div className={`flex items-center py-1.5 ${first ? "" : "border-t border-[var(--line)]"}`}>
       <div className="flex flex-col flex-1 min-w-0 pr-2">
         <Link
-          href={`/complex?apt=${encodeURIComponent(r.name)}&sgg=${r.sgg_cd}`}
+          href={complexHref(r.sgg_cd, r.name)}
           className="text-sm font-bold text-[var(--ink)] leading-tight truncate hover:underline"
         >{r.name}</Link>
         <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
@@ -66,7 +67,7 @@ function RebRow({ r, first }: { r: DigestRow; first: boolean }) {
     <div className={`flex items-center py-1.5 ${first ? "" : "border-t border-[var(--line)]"}`}>
       <div className="flex flex-col flex-1 min-w-0 pr-2">
         <Link
-          href={`/complex?apt=${encodeURIComponent(r.name)}&sgg=${r.sgg_cd}`}
+          href={complexHref(r.sgg_cd, r.name)}
           className="text-sm font-bold text-[var(--ink)] leading-tight truncate hover:underline"
         >{r.name}</Link>
         <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">

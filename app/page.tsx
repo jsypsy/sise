@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import type { Signal } from "@/lib/types";
 import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
+import { complexHref } from "@/lib/complex";
 import MainSearch from "./main-search";
 
 async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
@@ -57,7 +58,7 @@ function SignalList({ items, accent }: { items: Signal[]; accent: string }) {
           <span className="text-xs text-[var(--ink-soft)] tabular-nums w-4 shrink-0">{i + 1}</span>
           <div className="flex-1 min-w-0">
             <Link
-              href={`/complex?apt=${encodeURIComponent(s.apt_nm)}&sgg=${encodeURIComponent(s.sgg_cd)}`}
+              href={complexHref(s.sgg_cd, s.apt_nm)}
               className="font-medium hover:underline truncate block"
             >
               {s.apt_nm}

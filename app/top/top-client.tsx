@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { won } from "@/lib/format";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME } from "@/lib/regions";
+import { complexHref } from "@/lib/complex";
 import type { Signal } from "@/lib/types";
 
 function sinceStr() {
@@ -26,7 +27,7 @@ function SignalList({ items, loading }: { items: Signal[]; loading: boolean }) {
           <span className="text-xs text-[var(--ink-soft)] tabular-nums w-4 shrink-0">{i + 1}</span>
           <div className="flex-1 min-w-0">
             <Link
-              href={`/complex?apt=${encodeURIComponent(s.apt_nm)}&sgg=${encodeURIComponent(s.sgg_cd)}`}
+              href={complexHref(s.sgg_cd, s.apt_nm)}
               className="font-medium hover:underline truncate block"
             >
               {s.apt_nm}

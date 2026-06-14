@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { won } from "@/lib/format";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME } from "@/lib/regions";
-import TrendChart from "./trend-chart";
+import { complexHref } from "@/lib/complex";
 
 type SearchResult = {
   apt_nm: string;
@@ -15,42 +14,13 @@ type SearchResult = {
   peak_price: number;
 };
 
-type RawDeal = { d: string; p: number; py: number; fl: number | null; g: string; c: boolean };
-type DealRow = RawDeal & { delta_pct: number | null; is_high: boolean };
-
-const PAGE_SIZE = 20;
-
-function computeDeltas(deals: RawDeal[]): DealRow[] {
-  // 평형별 최고가 (취소 제외)
-  const peakByPy = new Map<number, number>();
-  for (const d of deals) {
-    if (d.c) continue;
-    peakByPy.set(d.py, Math.max(peakByPy.get(d.py) ?? 0, d.p));
-  }
-
-  const sorted = [...deals].sort((a, b) => a.d.localeCompare(b.d));
-  const prevByPy = new Map<number, number>();
-  return sorted
-    .map((deal) => {
-      const prev = prevByPy.get(deal.py);
-      const delta = !deal.c && prev != null
-        ? Math.round((deal.p - prev) / prev * 100)
-        : null;
-      if (!deal.c) prevByPy.set(deal.py, deal.p);
-      const is_high = !deal.c && deal.p === peakByPy.get(deal.py);
-      return { ...deal, delta_pct: delta, is_high };
-    })
-    .sort((a, b) => b.d.localeCompare(a.d));
-}
-
 const SELECT_CLS =
   "border border-[var(--line)] rounded px-3 py-1.5 text-sm bg-[var(--paper)] focus:outline-none focus:border-[var(--ink-soft)] disabled:opacity-40 w-full";
 
 function ComplexInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const qHint = searchParams.get("q") ?? "";
-
-  const pendingApt = useRef("");
 
   const [sido, setSido] = useState("");
   const [sggCd, setSggCd] = useState("");
@@ -62,35 +32,15 @@ function ComplexInner() {
   const [qResults, setQResults] = useState<SearchResult[]>([]);
   const [qLoading, setQLoading] = useState(false);
 
-  const [selected, setSelected] = useState<{ apt_nm: string; sgg_cd: string } | null>(null);
-  const [rawDeals, setRawDeals] = useState<RawDeal[]>([]);
-  const [deals, setDeals] = useState<DealRow[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const [filterPy, setFilterPy] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
-
-  function resetDeals() {
-    setSelected(null);
-    setRawDeals([]);
-    setDeals([]);
-    setFilterPy(null);
-    setPage(1);
+  function goToApt(sgg: string, apt: string) {
+    router.push(complexHref(sgg, apt));
   }
 
-  // URL 파라미터(apt, sgg)로 진입한 경우 드롭다운 자동 선택
+  // 레거시 딥링크(/complex?apt=&sgg=) → 단지 전용 URL로 영구 이동
   useEffect(() => {
-    const aptParam = searchParams.get("apt") ?? "";
-    const sggParam = searchParams.get("sgg") ?? "";
-    if (!sggParam) return;
-    for (const [s, sggs] of Object.entries(REGIONS)) {
-      if (sggParam in sggs) {
-        pendingApt.current = aptParam;
-        setSido(s);
-        setSggCd(sggParam);
-        break;
-      }
-    }
+    const apt = searchParams.get("apt");
+    const sgg = searchParams.get("sgg");
+    if (apt && sgg) router.replace(complexHref(sgg, apt));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -108,86 +58,31 @@ function ComplexInner() {
 
   // sggCd 변경 → 시군구 전체 단지 목록
   useEffect(() => {
-    if (!sggCd) { setAptList([]); setAptLoading(false); setUmdNm(""); setAptNm(""); resetDeals(); return; }
+    if (!sggCd) { setAptList([]); setAptLoading(false); setUmdNm(""); setAptNm(""); return; }
     setAptList([]);
     setAptLoading(true);
     setUmdNm("");
     setAptNm("");
-    resetDeals();
     fetch(`/api/search?sgg=${sggCd}`)
       .then((r) => r.json())
-      .then((d: SearchResult[]) => {
-        setAptList(d);
-        if (pendingApt.current) {
-          const match = d.find((r) => r.apt_nm === pendingApt.current);
-          pendingApt.current = "";
-          if (match) handleSelectApt(match);
-        }
-      })
+      .then((d: SearchResult[]) => setAptList(d))
       .catch(() => setAptList([]))
       .finally(() => setAptLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sggCd]);
-
-  async function handleSelectApt(result: SearchResult) {
-    setAptNm(result.apt_nm);
-    setUmdNm(result.umd_nm ?? "");
-    setSelected({ apt_nm: result.apt_nm, sgg_cd: result.sgg_cd });
-    setRawDeals([]);
-    setDeals([]);
-    setFilterPy(null);
-    setPage(1);
-    setLoading(true);
-
-    const r2Url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
-    if (r2Url) {
-      try {
-        const res = await fetch(
-          `${r2Url}/${result.sgg_cd}/${encodeURIComponent(result.apt_nm)}.json`
-        );
-        if (res.ok) {
-          const json: { deals: RawDeal[] } = await res.json();
-          setRawDeals(json.deals);
-          setDeals(computeDeltas(json.deals));
-        }
-      } catch {
-        // R2 없으면 빈 목록
-      }
-    }
-
-    setLoading(false);
-  }
-
-  function handleQResultClick(result: SearchResult) {
-    setQResults([]);
-    for (const [s, sggs] of Object.entries(REGIONS)) {
-      if (result.sgg_cd in sggs) {
-        pendingApt.current = result.apt_nm;
-        setSido(s);
-        setSggCd(result.sgg_cd);
-        break;
-      }
-    }
-  }
 
   function handleUmdChange(next: string) {
     setUmdNm(next);
     setAptNm("");
-    resetDeals();
   }
 
   function handleAptChange(name: string) {
-    if (!name) { setAptNm(""); resetDeals(); return; }
+    setAptNm(name);
+    if (!name) return;
     const result = visibleApts.find((r) => r.apt_nm === name);
-    if (result) handleSelectApt(result);
+    if (result) goToApt(result.sgg_cd, result.apt_nm);
   }
 
-  function handleFilterPy(py: number | null) {
-    setFilterPy(py);
-    setPage(1);
-  }
-
-  // aptList에서 동 목록 파생 (클라이언트 필터링)
+  // aptList에서 동 목록 파생
   const umdList = useMemo(() => {
     const seen = new Set<string>();
     const result: string[] = [];
@@ -197,27 +92,10 @@ function ComplexInner() {
     return result.sort((a, b) => a.localeCompare(b, "ko"));
   }, [aptList]);
 
-  // 선택된 동으로 단지 필터링
   const visibleApts = useMemo(
     () => (umdNm ? aptList.filter((r) => r.umd_nm === umdNm) : aptList),
     [aptList, umdNm]
   );
-
-  const pyeongOptions = useMemo(() => {
-    const count = new Map<number, number>();
-    for (const d of deals) {
-      if (!d.c) count.set(d.py, (count.get(d.py) ?? 0) + 1);
-    }
-    return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([py]) => py);
-  }, [deals]);
-
-  const filteredDeals = useMemo(
-    () => (filterPy != null ? deals.filter((d) => d.py === filterPy) : deals),
-    [deals, filterPy]
-  );
-
-  const totalPages = Math.ceil(filteredDeals.length / PAGE_SIZE);
-  const pagedDeals = filteredDeals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const sggList = sido
     ? Object.entries(REGIONS[sido] ?? {}).sort(([, a], [, b]) => a.localeCompare(b, "ko"))
@@ -265,7 +143,7 @@ function ComplexInner() {
       </div>
 
       {/* 메인 검색창 q 파라미터 → 결과 목록 */}
-      {qHint && !selected && (
+      {qHint && (
         <div className="mb-6">
           {qLoading ? (
             <p className="text-sm text-[var(--ink-soft)]">검색 중…</p>
@@ -274,7 +152,7 @@ function ComplexInner() {
               {qResults.map((r) => (
                 <button
                   key={`${r.apt_nm}|${r.sgg_cd}`}
-                  onClick={() => handleQResultClick(r)}
+                  onClick={() => goToApt(r.sgg_cd, r.apt_nm)}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--paper-2)] border-b border-[var(--line)] last:border-0"
                 >
                   <span className="font-medium">{r.apt_nm}</span>
@@ -291,153 +169,11 @@ function ComplexInner() {
           )}
         </div>
       )}
-
-      {loading && <p className="text-sm text-[var(--ink-soft)]">로딩 중…</p>}
-
-      {selected && !loading && (
-        <div>
-          <TrendChart deals={rawDeals} selectedPy={filterPy} />
-
-          <div className="flex items-center gap-2 mb-3">
-            <button
-              onClick={() => { setAptNm(""); resetDeals(); }}
-              className="text-xs text-[var(--ink-soft)] hover:underline"
-            >
-              ← 다시 선택
-            </button>
-            <h3 className="font-semibold">{selected.apt_nm}</h3>
-            <span className="text-xs text-[var(--ink-soft)]">
-              {CODE_TO_NAME[selected.sgg_cd] ?? selected.sgg_cd}
-            </span>
-            {deals.length > 0 && (
-              <span className="text-xs text-[var(--ink-soft)]">· 총 {deals.length.toLocaleString()}건</span>
-            )}
-          </div>
-
-          {/* 평형 필터 */}
-          {pyeongOptions.length > 1 && (
-            <div className="flex gap-1.5 flex-wrap mb-4">
-              <button
-                onClick={() => handleFilterPy(null)}
-                className={`text-xs px-2.5 py-1 rounded border ${
-                  filterPy === null
-                    ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]"
-                    : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--ink-soft)]"
-                }`}
-              >
-                전체
-              </button>
-              {pyeongOptions.map((py) => (
-                <button
-                  key={py}
-                  onClick={() => handleFilterPy(py)}
-                  className={`text-xs px-2.5 py-1 rounded border ${
-                    filterPy === py
-                      ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]"
-                      : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--ink-soft)]"
-                  }`}
-                >
-                  {py}평
-                </button>
-              ))}
-            </div>
-          )}
-
-          {filteredDeals.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]">거래 이력이 없습니다.</p>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b-2 border-[var(--line-strong)] text-left text-xs text-[var(--ink-soft)]">
-                      <th className="py-2 pr-3 font-medium">거래일</th>
-                      <th className="py-2 pr-3 font-medium">평형/층</th>
-                      <th className="py-2 pr-3 font-medium text-right">거래가</th>
-                      <th className="py-2 pr-3 font-medium">유형</th>
-                      <th className="py-2 font-medium text-right">증감</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedDeals.map((deal, i) => (
-                      <tr
-                        key={i}
-                        className={`border-b border-[var(--line)] hover:bg-[var(--paper-2)] ${deal.c ? "opacity-40" : ""}`}
-                      >
-                        <td className="py-1.5 pr-3 text-xs">{deal.d}</td>
-                        <td className="py-1.5 pr-3 whitespace-nowrap">
-                          {deal.py}평{deal.fl != null ? ` ${deal.fl}층` : ""}
-                        </td>
-                        <td className="py-1.5 pr-3 text-right font-medium whitespace-nowrap">
-                          {deal.is_high && (
-                            <span className="inline-block text-[10px] font-bold text-[var(--red)] border border-[var(--red)] rounded px-1 py-0 mr-1 leading-tight align-middle">
-                              최고가
-                            </span>
-                          )}
-                          <span className={deal.g === "직거래" ? "text-[var(--blue)]" : deal.is_high ? "text-[var(--red)]" : ""}>
-                            {won(deal.p)}
-                          </span>
-                        </td>
-                        <td className="py-1.5 pr-3 text-xs whitespace-nowrap">
-                          {deal.c ? (
-                            <span className="text-[var(--ink-soft)]">취소</span>
-                          ) : deal.g === "직거래" ? (
-                            <span className="text-[var(--blue)]">직</span>
-                          ) : null}
-                        </td>
-                        <td className="py-1.5 text-right text-xs">
-                          {deal.delta_pct != null ? (
-                            <span
-                              className={
-                                deal.delta_pct > 0
-                                  ? "text-[var(--red)]"
-                                  : deal.delta_pct < 0
-                                  ? "text-[var(--blue)]"
-                                  : ""
-                              }
-                            >
-                              {deal.delta_pct > 0 ? "+" : ""}{deal.delta_pct}%
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-3 mt-4">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="px-3 py-1 border border-[var(--line)] rounded text-xs disabled:opacity-40 hover:bg-[var(--paper-2)]"
-                  >
-                    ← 이전
-                  </button>
-                  <span className="text-xs text-[var(--ink-soft)]">
-                    {page} / {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="px-3 py-1 border border-[var(--line)] rounded text-xs disabled:opacity-40 hover:bg-[var(--paper-2)]"
-                  >
-                    다음 →
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
-export default function ComplexPage() {
+export default function ComplexClient() {
   return (
     <Suspense>
       <ComplexInner />
