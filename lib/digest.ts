@@ -18,6 +18,7 @@ function guOnly(sgg_cd: string): string {
 // 카드 렌더용 구조화 행. 텍스트 파싱 없이 화면이 바로 그린다.
 export type DigestRow = {
   name: string;
+  sgg_cd: string;
   loc: string;
   pyeong: number;
   price: string; // 만원 → "29억 5,000"
@@ -69,6 +70,7 @@ export async function buildDigest(): Promise<Digest> {
 
   const highs: DigestRow[] = highSignals.map((s) => ({
     name: s.apt_nm,
+    sgg_cd: s.sgg_cd,
     loc: loc(s),
     pyeong: s.pyeong,
     price: won(s.price),
@@ -78,6 +80,7 @@ export async function buildDigest(): Promise<Digest> {
 
   const rebs: DigestRow[] = rebSignals.map((s) => ({
     name: s.apt_nm,
+    sgg_cd: s.sgg_cd,
     loc: loc(s),
     pyeong: s.pyeong,
     price: won(s.price),

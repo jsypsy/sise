@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import type { Digest, DigestRow } from "@/lib/digest";
@@ -39,7 +40,10 @@ function HighRow({ r, first }: { r: DigestRow; first: boolean }) {
   return (
     <div className={`flex items-center py-1.5 ${first ? "" : "border-t border-[var(--line)]"}`}>
       <div className="flex flex-col flex-1 min-w-0 pr-2">
-        <span className="text-sm font-bold text-[var(--ink)] leading-tight truncate">{r.name}</span>
+        <Link
+          href={`/complex?apt=${encodeURIComponent(r.name)}&sgg=${r.sgg_cd}`}
+          className="text-sm font-bold text-[var(--ink)] leading-tight truncate hover:underline"
+        >{r.name}</Link>
         <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
           {r.loc} · {r.pyeong}평
         </span>
@@ -61,7 +65,10 @@ function RebRow({ r, first }: { r: DigestRow; first: boolean }) {
   return (
     <div className={`flex items-center py-1.5 ${first ? "" : "border-t border-[var(--line)]"}`}>
       <div className="flex flex-col flex-1 min-w-0 pr-2">
-        <span className="text-sm font-bold text-[var(--ink)] leading-tight truncate">{r.name}</span>
+        <Link
+          href={`/complex?apt=${encodeURIComponent(r.name)}&sgg=${r.sgg_cd}`}
+          className="text-sm font-bold text-[var(--ink)] leading-tight truncate hover:underline"
+        >{r.name}</Link>
         <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
           {r.loc} · {r.pyeong}평
         </span>

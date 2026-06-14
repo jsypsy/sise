@@ -128,6 +128,7 @@ function ComplexInner() {
 
   async function handleSelectApt(result: SearchResult) {
     setAptNm(result.apt_nm);
+    setUmdNm(result.umd_nm ?? "");
     setSelected({ apt_nm: result.apt_nm, sgg_cd: result.sgg_cd });
     setRawDeals([]);
     setDeals([]);
