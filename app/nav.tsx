@@ -8,6 +8,7 @@ const tabs = [
   { href: "/top",     label: "지역별" },
   { href: "/complex", label: "단지 조회" },
   { href: "/digest",  label: "다이제스트" },
+  { href: "/guide",   label: "가이드" },
 ];
 
 export default function Nav() {
