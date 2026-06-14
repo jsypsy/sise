@@ -55,13 +55,16 @@ async function notify(message: string, contact: string | null, path: string | nu
     const to = process.env.FEEDBACK_EMAIL_TO ?? "jsypsy@gmail.com";
     const from = process.env.FEEDBACK_EMAIL_FROM ?? "시세 피드백 <onboarding@resend.dev>";
     try {
-      await fetch("https://api.resend.com/emails", {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from, to, subject: "[시세] 새 피드백", text }),
       });
-    } catch {
-      /* 알림 실패는 무시 */
+      if (!res.ok) {
+        console.error("[feedback] Resend 발송 실패:", res.status, await res.text());
+      }
+    } catch (e) {
+      console.error("[feedback] Resend 예외:", e);
     }
   }
 
