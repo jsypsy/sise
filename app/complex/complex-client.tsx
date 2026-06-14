@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME } from "@/lib/regions";
 import { complexHref } from "@/lib/complex";
@@ -141,6 +142,15 @@ function ComplexInner() {
           ))}
         </select>
       </div>
+
+      {sggCd && aptList.length > 0 && (
+        <Link
+          href={`/complex/${sggCd}`}
+          className="inline-block text-sm text-[var(--blue)] hover:underline mb-6"
+        >
+          {CODE_TO_NAME[sggCd] ?? sggCd} 단지 전체 보기 →
+        </Link>
+      )}
 
       {/* 메인 검색창 q 파라미터 → 결과 목록 */}
       {qHint && (

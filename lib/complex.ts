@@ -1,6 +1,7 @@
 // 단지 상세 — R2(전체이력) 데이터 타입·서버 fetch·URL 헬퍼. (server/client 공용, no "use client")
 import { won } from "./format";
 import { CODE_TO_NAME } from "./regions";
+import { supabase } from "./supabase";
 
 // R2 raw 파일의 거래 1건 (fetch_peaks가 적재한 축약 키)
 export type RawDeal = {
@@ -54,4 +55,39 @@ export function summarize(deals: RawDeal[]) {
 export function locationLabel(sgg: string, umd: string | null): string {
   const region = CODE_TO_NAME[sgg] ?? sgg;
   return umd ? `${region} ${umd}` : region;
+}
+
+// 지역 허브용 — 시군구 내 단지 목록(최근 거래 기준, 취소 제외). 단지명 가나다순.
+export type AptSummary = {
+  apt_nm: string;
+  umd_nm: string | null;
+  tx_count: number;
+  latest_date: string;
+  peak_price: number;
+};
+
+export async function fetchAptsInSgg(sgg: string): Promise<AptSummary[]> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("apt_nm, umd_nm, price, deal_date")
+    .eq("sgg_cd", sgg)
+    .eq("canceled", false)
+    .order("deal_date", { ascending: false })
+    .limit(5000);
+
+  const groups = new Map<string, AptSummary>();
+  for (const row of (data ?? []) as { apt_nm: string; umd_nm: string | null; price: number; deal_date: string }[]) {
+    const g = groups.get(row.apt_nm);
+    if (!g) {
+      groups.set(row.apt_nm, {
+        apt_nm: row.apt_nm, umd_nm: row.umd_nm, tx_count: 1,
+        latest_date: row.deal_date, peak_price: row.price,
+      });
+    } else {
+      g.tx_count++;
+      if (row.price > g.peak_price) g.peak_price = row.price;
+      if (row.deal_date > g.latest_date) g.latest_date = row.deal_date;
+    }
+  }
+  return [...groups.values()].sort((a, b) => a.apt_nm.localeCompare(b.apt_nm, "ko"));
 }

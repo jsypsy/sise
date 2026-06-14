@@ -57,7 +57,13 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
       <nav className="text-xs text-[var(--ink-soft)] mb-3">
         <Link href="/complex" className="hover:underline">단지 조회</Link>
         <span className="mx-1">›</span>
-        <span>{loc}</span>
+        <Link href={`/complex/${sgg}`} className="hover:underline">{locationLabel(sgg, null)}</Link>
+        {cx.umd_nm && (
+          <>
+            <span className="mx-1">›</span>
+            <span>{cx.umd_nm}</span>
+          </>
+        )}
       </nav>
 
       <h1 className="text-2xl font-bold tracking-tight">

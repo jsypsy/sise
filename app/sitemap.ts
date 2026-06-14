@@ -1,15 +1,23 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
+import { REGIONS } from "@/lib/regions";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const routes: { path: string; priority: number; changeFrequency: "daily" | "weekly" }[] = [
-    { path: "/", priority: 1.0, changeFrequency: "daily" },
-    { path: "/digest", priority: 0.9, changeFrequency: "daily" },
-    { path: "/top", priority: 0.8, changeFrequency: "daily" },
-    { path: "/complex", priority: 0.6, changeFrequency: "weekly" },
+
+  const staticRoutes = [
+    { path: "/", priority: 1.0, changeFrequency: "daily" as const },
+    { path: "/digest", priority: 0.9, changeFrequency: "daily" as const },
+    { path: "/top", priority: 0.8, changeFrequency: "daily" as const },
+    { path: "/complex", priority: 0.6, changeFrequency: "weekly" as const },
   ];
-  return routes.map((r) => ({
+
+  // 지역 허브 페이지(시군구별) — 단지 상세는 이 페이지들의 내부 링크로 크롤 발견.
+  const regionRoutes = Object.values(REGIONS)
+    .flatMap((m) => Object.keys(m))
+    .map((sgg) => ({ path: `/complex/${sgg}`, priority: 0.7, changeFrequency: "daily" as const }));
+
+  return [...staticRoutes, ...regionRoutes].map((r) => ({
     url: `${SITE_URL}${r.path}`,
     lastModified: now,
     changeFrequency: r.changeFrequency,
