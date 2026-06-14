@@ -219,8 +219,26 @@ export default function DigestClient({ digest }: { digest: Digest }) {
         )}
       </div>
 
-      <div className="max-w-md">
-        <DigestBody total={total} highs={highs} rebs={rebs} />
+      <div className="max-w-2xl">
+        <div className="flex gap-1.5 mb-0.5">
+          <Chip text={`총 ${total}건`} bg="var(--paper-2)" fg="var(--ink-soft)" />
+          <Chip text={`신고가 ${highs.length}`} bg="var(--red-bg)" fg="var(--red)" />
+          <Chip text={`반등 ${rebs.length}`} bg="#E4ECF4" fg="var(--blue)" />
+        </div>
+        <div className="md:grid md:grid-cols-2 md:gap-x-10">
+          {highs.length > 0 && (
+            <div>
+              <SectionHeader color="var(--red)" label="신고가" count={highs.length} />
+              {highs.map((r, i) => <HighRow key={`h${i}`} r={r} first={i === 0} />)}
+            </div>
+          )}
+          {rebs.length > 0 && (
+            <div>
+              <SectionHeader color="var(--blue)" label="반등 · 전고점 회복" count={rebs.length} />
+              {rebs.map((r, i) => <RebRow key={`r${i}`} r={r} first={i === 0} />)}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 공유 이미지용 카드 — 화면 밖에서만 렌더되어 캡처 대상이 된다(페이지엔 안 보임).
