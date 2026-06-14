@@ -70,12 +70,7 @@ export default function RootLayout({
           <div className="max-w-4xl mx-auto w-full flex gap-3">
             <Link href="/about" className="hover:underline">소개</Link>
             <Link href="/privacy" className="hover:underline">개인정보처리방침</Link>
-            <a
-              href="mailto:jsypsy@gmail.com?subject=%5B%EC%8B%9C%EC%84%B8%5D%20%ED%94%BC%EB%93%9C%EB%B0%B1"
-              className="hover:underline"
-            >
-              의견 보내기
-            </a>
+            <Link href="/feedback" className="hover:underline">의견 보내기</Link>
           </div>
         </footer>
 

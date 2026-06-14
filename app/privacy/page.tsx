@@ -75,10 +75,8 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="9. 문의">
-        개인정보 처리에 관한 문의:{" "}
-        <a className="text-[var(--blue)] hover:underline" href="mailto:jsypsy@gmail.com">
-          jsypsy@gmail.com
-        </a>
+        개인정보 처리 및 서비스에 관한 문의는{" "}
+        <a className="text-[var(--blue)] hover:underline" href="/feedback">의견 보내기</a> 페이지를 이용해 주세요.
       </Section>
     </article>
   );
