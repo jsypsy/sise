@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { won } from "@/lib/format";
@@ -45,12 +45,19 @@ function SignalList({ items, loading }: { items: Signal[]; loading: boolean }) {
   );
 }
 
-export default function TopPage() {
+export default function TopPage({
+  initialHighs,
+  initialRebounds,
+}: {
+  initialHighs: Signal[];
+  initialRebounds: Signal[];
+}) {
   const [sido, setSido] = useState("");
   const [sggCd, setSggCd] = useState("");
-  const [highs, setHighs] = useState<Signal[]>([]);
-  const [rebounds, setRebounds] = useState<Signal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [highs, setHighs] = useState<Signal[]>(initialHighs);
+  const [rebounds, setRebounds] = useState<Signal[]>(initialRebounds);
+  const [loading, setLoading] = useState(false);
+  const firstRender = useRef(true);
 
   const sggList = sido
     ? Object.entries(REGIONS[sido] ?? {}).sort(([, a], [, b]) =>
@@ -59,6 +66,13 @@ export default function TopPage() {
     : [];
 
   useEffect(() => {
+    // 초기 렌더(전국 기본)는 서버에서 받은 데이터를 그대로 사용 — 재요청 생략(SSR 결과 유지).
+    if (firstRender.current && !sido && !sggCd) {
+      firstRender.current = false;
+      return;
+    }
+    firstRender.current = false;
+
     let cancelled = false;
     setLoading(true);
 
