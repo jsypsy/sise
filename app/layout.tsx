@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Script from "next/script";
+import Link from "next/link";
 import { Gowun_Batang } from "next/font/google";
 import "./globals.css";
 import Nav from "./nav";
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, ADSENSE_CLIENT } from "@/lib/site";
 
 const gowun = Gowun_Batang({
   weight: ["400", "700"],
@@ -63,9 +65,25 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="border-t border-[var(--line)] px-4 py-3 text-xs text-[var(--ink-soft)]">
-          본 서비스는 국토교통부 실거래가 공개시스템 데이터를 가공한 것으로 정부 공식 서비스가 아니며,
-          정보의 정확성·완전성을 보장하지 않습니다. 평형은 추정치이며 투자 판단의 책임은 이용자에게 있습니다.
+          <div className="max-w-4xl mx-auto w-full">
+            <p>
+              본 서비스는 국토교통부 실거래가 공개시스템 데이터를 가공한 것으로 정부 공식 서비스가 아니며,
+              정보의 정확성·완전성을 보장하지 않습니다. 평형은 추정치이며 투자 판단의 책임은 이용자에게 있습니다.
+            </p>
+            <p className="mt-1">
+              <Link href="/privacy" className="hover:underline">개인정보처리방침</Link>
+            </p>
+          </div>
         </footer>
+
+        {ADSENSE_CLIENT && (
+          <Script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+            crossOrigin="anonymous"
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );
