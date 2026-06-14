@@ -1,11 +1,3 @@
-<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    .fg{stroke:#1A1814}.fgf{fill:#1A1814}
-    @media (prefers-color-scheme:dark){.fg{stroke:#FAF7F0}.fgf{fill:#FAF7F0}}
-  </style>
-  <line class="fg" x1="150" y1="148" x2="204" y2="202" stroke-width="24" stroke-linecap="round"/>
-  <circle class="fg" cx="108" cy="106" r="66" fill="none" stroke-width="16"/>
-  <polygon points="108,74 146,110 70,110" fill="#C7321F"/>
-  <rect class="fg" x="82" y="110" width="52" height="42" fill="none" stroke-width="10"/>
-  <rect class="fgf" x="99" y="130" width="18" height="22" rx="2"/>
-</svg>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="56" fill="#C7321F"/>
+  <path d="M60 122 L128 62 L196 122" fill="none" stroke="#FAF7F0" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M80 118 V198 H176 V118" fill="none" stroke="#FAF7F0" stroke-width="14" stroke-linejoin="round"/><mask id="satori_om-id"><rect x="0" y="0" width="256" height="256" fill="#fff"/></mask><mask id="satori_om-id-0"><rect x="90" y="114" width="77" height="84" fill="#fff"/></mask><g  ><path fill="#FAF7F0" d="M106.7 186L118.6 186L124.5 160.2L132.4 160.2L138.2 186L150.2 186L156.3 160.2L165.3 160.2L165.3 152.4L158.2 152.4L164.2 126.6L152.9 126.6L147.7 152.4L139.6 152.4L133.7 126.6L123.1 126.6L117.2 152.4L109.3 152.4L103.9 126.6L92.6 126.6L98.7 152.4L91.6 152.4L91.6 160.2L100.6 160.2ZM110.9 160.2L115.4 160.2L113.3 169.5L112.8 169.5ZM126.3 152.4L128.2 143.8L128.6 143.8L130.6 152.4ZM141.4 160.2L146.0 160.2L144.1 169.6L143.6 169.6Z "/></g></svg>
