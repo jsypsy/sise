@@ -14,6 +14,7 @@ export default function Nav() {
   const pathname = usePathname();
   return (
     <nav className="border-b border-[var(--line)]">
+      <div className="max-w-4xl mx-auto w-full">
       <ul className="flex overflow-x-auto">
         {tabs.map(({ href, label }) => {
           const active = pathname === href;
@@ -33,6 +34,7 @@ export default function Nav() {
           );
         })}
       </ul>
+      </div>
     </nav>
   );
 }

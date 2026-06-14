@@ -21,16 +21,18 @@ export default function RootLayout({
   return (
     <html lang="ko" className={gowun.variable}>
       <body className="bg-[var(--paper)] text-[var(--ink)] min-h-screen flex flex-col">
-        <header className="border-b-[3px] border-double border-[var(--line-strong)] px-4 py-4">
-          <h1
-            className="text-3xl font-bold tracking-tight"
-            style={{ fontFamily: "var(--font-gowun), serif" }}
-          >
-            시세
-          </h1>
-          <p className="text-xs text-[var(--ink-soft)] mt-1 tracking-widest uppercase">
-            아파트 매매 실거래 시그널
-          </p>
+        <header className="border-b-[3px] border-double border-[var(--line-strong)] py-4">
+          <div className="max-w-4xl mx-auto px-4 w-full">
+            <h1
+              className="text-3xl font-bold tracking-tight"
+              style={{ fontFamily: "var(--font-gowun), serif" }}
+            >
+              시세
+            </h1>
+            <p className="text-xs text-[var(--ink-soft)] mt-1 tracking-widest uppercase">
+              아파트 매매 실거래 시그널
+            </p>
+          </div>
         </header>
         <Nav />
         <main className="flex-1 px-4 py-4 max-w-4xl mx-auto w-full">
