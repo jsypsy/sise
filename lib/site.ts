@@ -1,7 +1,7 @@
-// 정식 도메인 미정 — NEXT_PUBLIC_SITE_URL로 주입하고, 없으면 현재 Vercel 주소로 폴백.
-// 도메인 확정 시 이 환경변수만 바꾸면 metadataBase·sitemap·robots·OG 절대경로가 전부 따라온다.
+// 정식 도메인: sise.today. NEXT_PUBLIC_SITE_URL로 override 가능(프리뷰/스테이징용),
+// 없으면 프로덕션 도메인으로 폴백 → metadataBase·sitemap·robots·OG 절대경로가 따라온다.
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://sise-ten.vercel.app"
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://sise.today"
 ).replace(/\/$/, "");
 
 export const SITE_NAME = "시세";
