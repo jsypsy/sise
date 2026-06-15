@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "node:crypto";
 import { supabase } from "@/lib/supabase";
 
 const URL_RE = /https?:\/\//gi;
@@ -36,16 +35,9 @@ export async function POST(req: NextRequest) {
   }
 
   const user_agent = req.headers.get("user-agent")?.slice(0, 300) ?? null;
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-  const ip_hash = crypto.createHash("sha256").update(ip).digest("hex").slice(0, 32);
 
-  const { error } = await supabase.from("feedback").insert({ message, contact, path, user_agent, ip_hash });
+  const { error } = await supabase.from("feedback").insert({ message, contact, path, user_agent });
   if (error) {
-    // DB 트리거가 비율 제한으로 막은 경우
-    if (typeof error.message === "string" && error.message.includes("rate_limited")) {
-      return NextResponse.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
-    }
-    console.error("[feedback] insert 실패:", error.message);
     return NextResponse.json({ error: "접수에 실패했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
   }
 
