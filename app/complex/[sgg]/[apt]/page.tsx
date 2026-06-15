@@ -3,7 +3,8 @@ export const revalidate = 3600;
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchComplex, summarize, locationLabel } from "@/lib/complex";
+import { fetchComplex, summarize, locationLabel, fetchAptsInSgg, complexHref } from "@/lib/complex";
+import { won } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
 import ComplexDetail from "../../complex-detail";
 
@@ -38,6 +39,15 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
 
   const loc = locationLabel(sgg, cx.umd_nm);
   const s = summarize(cx.deals);
+
+  // 같은 동(없으면 같은 시군구) 다른 단지 — 내부 링크 + 탐색.
+  const inSgg = await fetchAptsInSgg(sgg);
+  const related = (cx.umd_nm ? inSgg.filter((a) => a.umd_nm === cx.umd_nm) : inSgg)
+    .filter((a) => a.apt_nm !== cx.apt_nm)
+    .sort((a, b) => b.tx_count - a.tx_count)
+    .slice(0, 12);
+  const relatedLabel = cx.umd_nm ? `${cx.umd_nm} 다른 단지` : `${locationLabel(sgg, null)} 다른 단지`;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "ApartmentComplex",
@@ -91,6 +101,25 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
       )}
 
       <ComplexDetail rawDeals={cx.deals} />
+
+      {related.length > 0 && (
+        <section className="mt-8 border-t border-[var(--line)] pt-4">
+          <h2 className="text-sm font-semibold mb-2">{relatedLabel}</h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            {related.map((a) => (
+              <li key={a.apt_nm}>
+                <Link
+                  href={complexHref(sgg, a.apt_nm)}
+                  className="flex items-baseline justify-between gap-2 py-1.5 border-b border-[var(--line)] hover:bg-[var(--paper-2)]"
+                >
+                  <span className="text-sm truncate">{a.apt_nm}</span>
+                  <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap tabular-nums">{won(a.peak_price)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <p className="text-xs text-[var(--ink-soft)] mt-6">
         국토부 실거래가 공개시스템 기반 · 직거래/취소거래 포함 표시 · 평형은 추정치 ·{" "}
