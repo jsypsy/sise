@@ -38,6 +38,11 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabase.from("feedback").insert({ message, contact, path, user_agent });
   if (error) {
+    // DB 트리거가 글로벌 비율 제한으로 막은 경우
+    if (typeof error.message === "string" && error.message.includes("rate_limited")) {
+      return NextResponse.json({ error: "지금은 요청이 많아요. 잠시 후 다시 시도해 주세요." }, { status: 429 });
+    }
+    console.error("[feedback] insert 실패:", error.message);
     return NextResponse.json({ error: "접수에 실패했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
   }
 
