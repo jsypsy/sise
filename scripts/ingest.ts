@@ -54,6 +54,12 @@ async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo:
     await new Promise(r => setTimeout(r, wait));
     return fetchPage(serviceKey, sgg_cd, ym, pageNo, attempt + 1);
   }
+  if (res.status === 502 && attempt < 2) {
+    const wait = 1000 * (attempt + 1); // 1s, 2s
+    console.warn(`  [${sgg_cd}/${ym}] 502 — ${wait / 1000}s 후 재시도 (${attempt + 1}/2)`);
+    await new Promise(r => setTimeout(r, wait));
+    return fetchPage(serviceKey, sgg_cd, ym, pageNo, attempt + 1);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const parsed = parser.parse(await res.text());
