@@ -47,7 +47,7 @@ async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo:
   url.searchParams.set("pageNo", String(pageNo));
   url.searchParams.set("numOfRows", "1000");
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(20_000) });
   if (res.status === 429 && attempt < 4) {
     const wait = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s
     console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/4)`);
