@@ -135,10 +135,11 @@ async function main() {
 
   // --ym=YYYYMM 이면 그 달만(수동 backfill). 없으면 당월부터 최근 N개월(기본 3).
   const firstSeen = todayDateKst();
-  // 기본 2개월(당월+전월 ≈ 45일). 30일 신고기한 지연분 대부분 커버하면서
-  // GitHub Actions 분 한도를 절약. (2026-06: 무료 2,000분 방어용 임시 축소.
-  //  7/1 한도 리셋 후 3으로 복구 + 저비용 점진 fetch_peaks 도입 예정.)
-  const months = args.months ? Math.max(1, parseInt(args.months, 10)) : 2;
+  // 기본 3개월(당월+전월+전전월 ≈ 90일). 30일 신고기한을 넘겨 늦게 등록되는
+  // 지연 신고분(계약은 전전월, 신고는 이번 달)까지 따라잡는다.
+  // (2026-06: 무료 2,000분 방어용으로 잠시 2개월로 줄였다가, 레포 public 전환으로
+  //  표준 러너 분이 무제한이 되어 3개월로 복원.)
+  const months = args.months ? Math.max(1, parseInt(args.months, 10)) : 3;
   const yms = args.ym ? [args.ym] : recentYmsKst(months);
 
   console.log(`수집 시작: ${targets.length}개 지역 × ${yms.length}개월 [${yms.join(", ")}], first_seen=${firstSeen}`);
