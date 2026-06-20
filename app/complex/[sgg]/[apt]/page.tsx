@@ -3,7 +3,7 @@ export const revalidate = 3600;
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchComplex, summarize, locationLabel, fetchAptsInSgg, complexHref } from "@/lib/complex";
+import { fetchComplexMerged, summarize, locationLabel, fetchAptsInSgg, complexHref } from "@/lib/complex";
 import { won } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
 import ComplexDetail from "../../complex-detail";
@@ -13,7 +13,7 @@ type Params = Promise<{ sgg: string; apt: string }>;
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { sgg, apt: aptRaw } = await params;
   const apt = decodeURIComponent(aptRaw);
-  const cx = await fetchComplex(sgg, apt);
+  const cx = await fetchComplexMerged(sgg, apt);
   if (!cx) {
     return { title: { absolute: `${apt} 실거래가 | 시세` }, robots: { index: false } };
   }
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function ComplexDetailPage({ params }: { params: Params }) {
   const { sgg, apt: aptRaw } = await params;
   const apt = decodeURIComponent(aptRaw);
-  const cx = await fetchComplex(sgg, apt);
+  const cx = await fetchComplexMerged(sgg, apt);
   if (!cx) notFound();
 
   const loc = locationLabel(sgg, cx.umd_nm);

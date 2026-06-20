@@ -1,4 +1,5 @@
 // 단지 상세 — R2(전체이력) 데이터 타입·서버 fetch·URL 헬퍼. (server/client 공용, no "use client")
+import { cache } from "react";
 import { won } from "./format";
 import { CODE_TO_NAME } from "./regions";
 import { supabase } from "./supabase";
@@ -41,6 +42,47 @@ export async function fetchComplex(sgg: string, apt: string): Promise<RawComplex
     return null;
   }
 }
+
+// DB(transactions 핫윈도우)에서 단지의 최근 거래를 RawDeal로 가져온다.
+// R2는 fetch_peaks 주기(최대 8일) 스냅샷이라 그 이후 신고된 최신 거래가 빠진다.
+// 매일 ingest가 채우는 DB로 이 공백을 메운다. anon read(RLS 허용)로 충분.
+async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled")
+    .eq("sgg_cd", sgg)
+    .eq("apt_nm", apt)
+    .limit(3000);
+  return (data ?? []).map((r) => ({
+    d: r.deal_date as string,
+    p: r.price as number,
+    a: r.area as number,
+    py: r.pyeong as number,
+    fl: (r.floor ?? null) as number | null,
+    g: r.dealing_gbn as string,
+    c: r.canceled as boolean,
+  }));
+}
+
+// R2 전체이력에 DB 최근 거래 중 R2에 없는 건만 더해 병합(중복 제거).
+// 키는 raw_key와 동일 식별자 — 한 단지 안에선 (날짜·가격·전용면적·층)이면 동일 거래.
+function mergeDeals(r2: RawDeal[], recent: RawDeal[]): RawDeal[] {
+  const key = (x: RawDeal) =>
+    `${x.d}|${x.p}|${x.a != null ? Number(x.a).toFixed(2) : ""}|${x.fl ?? ""}`;
+  const seen = new Set(r2.map(key));
+  const extra = recent.filter((x) => !seen.has(key(x)));
+  return extra.length ? [...r2, ...extra].sort((a, b) => a.d.localeCompare(b.d)) : r2;
+}
+
+// R2 전체이력 + DB 최근 거래를 병합한 단지 1개. 요청 내 중복 호출은 cache로 dedupe.
+export const fetchComplexMerged = cache(
+  async (sgg: string, apt: string): Promise<RawComplex | null> => {
+    const cx = await fetchComplex(sgg, apt);
+    if (!cx) return null;
+    const recent = await fetchRecentDeals(sgg, cx.apt_nm);
+    return { ...cx, deals: mergeDeals(cx.deals, recent) };
+  }
+);
 
 // 메타데이터/요약용 — 취소 제외 최신 거래·전고점·건수.
 export function summarize(deals: RawDeal[]) {
