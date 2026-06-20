@@ -1,0 +1,58 @@
+name: audit
+
+# 데이터 정합성 검수 — 지역×월로 국토부 totalCount vs R2 보유 건수 비교.
+# 국토부는 page-1만 받아(지역·월당 1콜) 저렴하지만, 샤드로 쪼개면 fetch-peaks cron과
+# 같은 날 quota가 겹칠 수 있으니 가급적 다른 날 또는 --sgg 단위로 돌린다.
+on:
+  workflow_dispatch:
+    inputs:
+      sgg:
+        description: '한 지역만 검수 (LAWD_CD 5자리). 비우면 전 지역/샤드'
+        required: false
+        default: ''
+      shard:
+        description: '샤드 번호 (1~N). 비우면 전 지역'
+        required: false
+        default: ''
+      shards:
+        description: '샤드 개수'
+        required: false
+        default: '8'
+      from:
+        description: '시작 월 YYYYMM (비우면 현재-14)'
+        required: false
+        default: ''
+      to:
+        description: '종료 월 YYYYMM (비우면 현재-2)'
+        required: false
+        default: ''
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: 정합성 검수
+        run: |
+          ARGS=""
+          [ -n "${{ inputs.sgg }}" ]    && ARGS="$ARGS --sgg=${{ inputs.sgg }}"
+          [ -n "${{ inputs.shard }}" ]  && ARGS="$ARGS --shard=${{ inputs.shard }} --shards=${{ inputs.shards }}"
+          [ -n "${{ inputs.from }}" ]   && ARGS="$ARGS --from=${{ inputs.from }}"
+          [ -n "${{ inputs.to }}" ]     && ARGS="$ARGS --to=${{ inputs.to }}"
+          echo "audit args:$ARGS"
+          npx tsx scripts/audit.ts $ARGS
+        env:
+          MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
