@@ -1,0 +1,35 @@
+name: audit-recheck
+
+# 일회성 진단 — fetch-peaks-schedule이 끝날 때마다 강동구(11740)를 자동 재검수.
+# 목적: 샤드 1(강동구)이 다음에 돌고 나면 202604 누락 4건이 메워지는지(=자가복구) 확인.
+# 강동구 audit은 국토부 ~13콜로 저렴해 같은 날 fetch_peaks와 quota가 안 겹친다.
+# 확인이 끝나면 이 워크플로는 삭제한다.
+on:
+  workflow_run:
+    workflows: ["fetch-peaks-schedule"]
+    types: [completed]
+
+jobs:
+  recheck:
+    # fetch-peaks가 성공해 R2가 갱신된 경우에만
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: 강동구 재검수
+        run: npx tsx scripts/audit.ts --sgg=11740
+        env:
+          MOLIT_SERVICE_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
