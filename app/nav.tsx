@@ -20,10 +20,10 @@ export default function Nav() {
         {tabs.map(({ href, label }) => {
           const active = pathname === href;
           return (
-            <li key={href}>
+            <li key={href} className="flex-1">
               <Link
                 href={href}
-                className={`block px-2 sm:px-4 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
+                className={`block text-center px-2 sm:px-4 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
                   active
                     ? "border-[var(--ink)] font-semibold text-[var(--ink)]"
                     : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
