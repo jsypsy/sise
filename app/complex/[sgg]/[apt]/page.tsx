@@ -86,20 +86,6 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
         {s.count > 0 && ` · 총 ${s.count.toLocaleString()}건`}
       </p>
 
-      {s.latest && (
-        <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 mb-5 text-sm">
-          <span>
-            <span className="text-[var(--ink-soft)]">최신</span>{" "}
-            <b>{s.latestWon}</b>{" "}
-            <span className="text-xs text-[var(--ink-soft)]">{s.latest.d}</span>
-          </span>
-          <span>
-            <span className="text-[var(--ink-soft)]">전고점</span>{" "}
-            <b className="text-[var(--red)]">{s.peakWon}</b>
-          </span>
-        </div>
-      )}
-
       <ComplexDetail rawDeals={cx.deals} />
 
       {related.length > 0 && (

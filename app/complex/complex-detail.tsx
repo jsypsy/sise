@@ -29,9 +29,6 @@ function computeDeltas(deals: RawDeal[]): DealRow[] {
 }
 
 export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
-  const [filterPy, setFilterPy] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
-
   const deals = useMemo(() => computeDeltas(rawDeals), [rawDeals]);
 
   const pyeongOptions = useMemo(() => {
@@ -40,10 +37,25 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
     return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([py]) => py);
   }, [deals]);
 
+  // 기본 평형: 국평(33~34평) 우선, 없으면 거래 최다 평형. 둘 다 없으면 전체.
+  const [filterPy, setFilterPy] = useState<number | null>(
+    () => pyeongOptions.find((py) => py === 33 || py === 34) ?? pyeongOptions[0] ?? null
+  );
+  const [page, setPage] = useState(1);
+
   const filteredDeals = useMemo(
     () => (filterPy != null ? deals.filter((d) => d.py === filterPy) : deals),
     [deals, filterPy]
   );
+
+  // 선택 평형(없으면 전체) 기준 최신·전고점. 헤더 요약을 평형과 일치시킨다.
+  const summary = useMemo(() => {
+    const valid = filteredDeals.filter((d) => !d.c);
+    if (valid.length === 0) return null;
+    const peak = valid.reduce((m, d) => Math.max(m, d.p), 0);
+    const latest = valid.reduce((a, b) => (b.d > a.d ? b : a), valid[0]);
+    return { peak, latest };
+  }, [filteredDeals]);
 
   const totalPages = Math.ceil(filteredDeals.length / PAGE_SIZE);
   const pagedDeals = filteredDeals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -59,6 +71,23 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
 
   return (
     <div>
+      {summary && (
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3 mb-4 text-sm">
+          <span className="text-xs font-medium text-[var(--ink-soft)]">
+            {filterPy != null ? `${filterPy}평` : "전체"}
+          </span>
+          <span>
+            <span className="text-[var(--ink-soft)]">최신</span>{" "}
+            <b>{won(summary.latest.p)}</b>{" "}
+            <span className="text-xs text-[var(--ink-soft)]">{summary.latest.d}</span>
+          </span>
+          <span>
+            <span className="text-[var(--ink-soft)]">전고점</span>{" "}
+            <b className="text-[var(--red)]">{won(summary.peak)}</b>
+          </span>
+        </div>
+      )}
+
       <TrendChart deals={rawDeals} selectedPy={filterPy} />
 
       {/* 평형 필터 */}
