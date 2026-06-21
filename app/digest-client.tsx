@@ -203,7 +203,7 @@ export default function DigestClient({ digest }: { digest: Digest }) {
         {date && <span className="text-sm text-[var(--ink-soft)] tabular-nums">{date}</span>}
       </div>
       <p className="text-xs text-[var(--ink-soft)] mb-3">
-        오늘 새로 등록된 신고가·반등. <b>이미지로 공유</b>하면 색·정렬 그대로, 텍스트 복붙도 가능합니다.
+        최근 신고 등록 기준 신고가·반등 — 일·월요일은 전 영업일 데이터. <b>이미지로 공유</b>하면 색·정렬 그대로, 텍스트 복붙도 가능합니다.
       </p>
 
       <div className="flex items-center gap-2 mb-4">

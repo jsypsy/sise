@@ -31,6 +31,21 @@ export async function GET(req: NextRequest) {
   const umd = req.nextUrl.searchParams.get("umd");
   const q   = req.nextUrl.searchParams.get("q")?.trim() ?? "";
 
+  // 동 목록만 빠르게 반환 (단일 컬럼 쿼리 → 응답 작음)
+  if (sgg && !q && req.nextUrl.searchParams.get("fields") === "umds") {
+    const { data } = await supabase
+      .from("transactions")
+      .select("umd_nm")
+      .eq("sgg_cd", sgg)
+      .eq("canceled", false)
+      .not("umd_nm", "is", null)
+      .limit(5000);
+    const umds = [...new Set((data ?? []).map((r) => r.umd_nm as string))].sort((a, b) =>
+      a.localeCompare(b, "ko")
+    );
+    return NextResponse.json(umds);
+  }
+
   // 단지 목록: sgg만 있을 때 → 해당 시군구 전체 단지
   if (sgg && !q) {
     let qb = supabase
