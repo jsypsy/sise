@@ -31,19 +31,13 @@ export async function GET(req: NextRequest) {
   const umd = req.nextUrl.searchParams.get("umd");
   const q   = req.nextUrl.searchParams.get("q")?.trim() ?? "";
 
-  // 동 목록만 빠르게 반환 (단일 컬럼 쿼리 → 응답 작음)
+  // 동 목록만 빠르게 반환 (DB에서 DISTINCT → 수십 개 문자열만 전송)
   if (sgg && !q && req.nextUrl.searchParams.get("fields") === "umds") {
-    const { data } = await supabase
-      .from("transactions")
-      .select("umd_nm")
-      .eq("sgg_cd", sgg)
-      .eq("canceled", false)
-      .not("umd_nm", "is", null)
-      .limit(5000);
-    const umds = [...new Set((data ?? []).map((r) => r.umd_nm as string))].sort((a, b) =>
-      a.localeCompare(b, "ko")
-    );
-    return NextResponse.json(umds);
+    const { data } = await supabase.rpc("get_umds", { p_sgg_cd: sgg });
+    const umds = (data ?? []) as string[];
+    return NextResponse.json(umds, {
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+    });
   }
 
   // 단지 목록: sgg만 있을 때 → 해당 시군구 전체 단지
