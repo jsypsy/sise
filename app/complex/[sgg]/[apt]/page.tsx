@@ -7,6 +7,7 @@ import { fetchComplexMerged, summarize, locationLabel, fetchAptsInSgg, complexHr
 import { won } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
 import ComplexDetail from "../../complex-detail";
+import WatchButton from "../../../watch-button";
 
 type Params = Promise<{ sgg: string; apt: string }>;
 
@@ -85,6 +86,10 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
         {cx.build_year ? ` · ${cx.build_year}년 준공` : ""}
         {s.count > 0 && ` · 총 ${s.count.toLocaleString()}건`}
       </p>
+
+      <div className="mt-3">
+        <WatchButton sgg={sgg} apt={cx.apt_nm} />
+      </div>
 
       <ComplexDetail rawDeals={cx.deals} />
 

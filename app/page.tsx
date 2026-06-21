@@ -15,6 +15,7 @@ import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
 import { complexHref } from "@/lib/complex";
 import MainSearch from "./main-search";
+import WatchlistSignals from "./watchlist-signals";
 
 async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
   // 최근 7일 '등록(신고)된' 거래 기준 — 계약일(deal_date)이 아니라 first_seen.
@@ -86,6 +87,8 @@ export default async function HomePage() {
           <MainSearch />
         </Suspense>
       </div>
+
+      <WatchlistSignals />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
         <section>
