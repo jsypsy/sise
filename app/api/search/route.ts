@@ -55,17 +55,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(apts);
   }
 
-  // 단지 검색: q 기준 ILIKE, sgg 있으면 한정
+  // 단지 검색: 공백 토큰 AND(ILIKE) 우선, sgg 있으면 한정
   if (!q) return NextResponse.json([]);
 
   let qb = supabase
     .from("transactions")
     .select("apt_nm, sgg_cd, umd_nm, price, deal_date")
-    .ilike("apt_nm", `%${q}%`)
     .eq("canceled", false);
+
+  // 공백으로 나눈 각 토큰을 모두 포함(순서 무관). 토큰 없으면 q 전체.
+  for (const term of q.split(/\s+/).filter(Boolean)) {
+    qb = qb.ilike("apt_nm", `%${term}%`);
+  }
 
   if (sgg) qb = qb.eq("sgg_cd", sgg);
 
   const { data } = await qb.order("deal_date", { ascending: false }).limit(300);
-  return NextResponse.json(groupApts(data ?? []));
+  const grouped = groupApts(data ?? []);
+  if (grouped.length > 0) return NextResponse.json(grouped);
+
+  // fallback: 어순 뒤바뀜·붙여쓰기·오타 → 트라이그램 유사도 검색
+  const { data: trgm } = await supabase.rpc("search_apts_trgm", { p_q: q });
+  const rows = (trgm ?? []) as AptRow[];
+  return NextResponse.json(sgg ? rows.filter((r) => r.sgg_cd === sgg) : rows);
 }
