@@ -207,7 +207,7 @@ function ComplexInner() {
                 <button
                   key={`${r.apt_nm}|${r.sgg_cd}`}
                   onClick={() => goToApt(r.sgg_cd, r.apt_nm)}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--paper-2)] border-b border-[var(--line)] last:border-0"
+                  className="w-full text-left px-4 py-2.5 text-sm cursor-pointer hover:bg-[var(--paper-2)] border-b border-[var(--line)] last:border-0"
                 >
                   <span className="font-medium">{r.apt_nm}</span>
                   <span className="text-xs text-[var(--ink-soft)] ml-2">
