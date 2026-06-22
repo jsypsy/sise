@@ -1,0 +1,7 @@
+# Cloudflare 로컬 미리보기(pnpm cf:preview)용 런타임 변수.
+# 이 파일을 .dev.vars로 복사해 실제 값을 채우세요(.dev.vars는 gitignore됨).
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_R2_PUBLIC_URL=
+NEXT_PUBLIC_SITE_URL=
+# 서버 전용(필요 시): SUPABASE_SERVICE_ROLE_KEY 등은 wrangler secret put 으로 주입 권장

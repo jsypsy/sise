@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sise",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // ISR/SSG 증분 캐시 저장소. 배포 전 Cloudflare에 이 이름의 R2 버킷을 만들어 두세요:
+  //   npx wrangler r2 bucket create sise-isr-cache
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "sise-isr-cache"
+    }
+  ]
+  // 런타임 환경변수(NEXT_PUBLIC_SUPABASE_URL 등)는 Cloudflare 대시보드 또는
+  // `wrangler secret put`으로 주입. 로컬 미리보기는 .dev.vars 사용.
+}
