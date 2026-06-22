@@ -67,7 +67,9 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="border-t border-[var(--line)] py-3 text-xs text-[var(--ink-soft)]">
-          <div className="max-w-4xl mx-auto px-4 w-full flex gap-3">
+          <div className="max-w-4xl mx-auto px-4 w-full flex flex-wrap gap-x-3 gap-y-1">
+            <Link href="/blog" className="hover:underline">블로그</Link>
+            <Link href="/guide" className="hover:underline">가이드</Link>
             <Link href="/about" className="hover:underline">소개</Link>
             <Link href="/privacy" className="hover:underline">개인정보처리방침</Link>
             <Link href="/feedback" className="hover:underline">의견 보내기</Link>
