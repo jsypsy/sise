@@ -5,7 +5,7 @@ import { CATEGORIES, CATEGORY_ORDER, postsByCategory } from "@/lib/blog";
 export const metadata: Metadata = {
   title: "블로그",
   description:
-    "아파트 실거래가로 시장을 읽는 법, 신고가·반등 시그널 활용, 부동산 개념과 뉴스를 쉽게 풀어쓴 글 모음.",
+    "아파트 실거래가로 시장을 읽는 법, 신고가·반등 시그널 활용, 부동산 개념을 쉽게 풀어쓴 글 모음.",
   alternates: { canonical: "/blog" },
 };
 
@@ -14,7 +14,7 @@ export default function BlogIndexPage() {
     <div>
       <h1 className="text-2xl font-bold tracking-tight mb-1">블로그</h1>
       <p className="text-sm text-[var(--ink-soft)] mb-6">
-        실거래가로 시장을 읽는 법, 시그널 활용, 부동산 개념과 뉴스를 쉽게 풀어쓴 글 모음입니다.
+        실거래가로 시장을 읽는 법, 시그널 활용, 부동산 개념을 쉽게 풀어쓴 글 모음입니다.
       </p>
 
       {CATEGORY_ORDER.map((cat) => {
