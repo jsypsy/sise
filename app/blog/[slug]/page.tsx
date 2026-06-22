@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { POSTS, POSTS_SORTED, getPost } from "@/lib/blog";
+import { POSTS, POSTS_SORTED, getPost, CATEGORIES } from "@/lib/blog";
 import { SITE_URL } from "@/lib/site";
 
 type Params = Promise<{ slug: string }>;
@@ -56,7 +56,11 @@ export default async function BlogPostPage({ params }: { params: Params }) {
       </nav>
 
       <h1 className="text-2xl font-bold tracking-tight mb-1">{p.title}</h1>
-      <p className="text-xs text-[var(--ink-soft)] mb-4 tabular-nums">{p.date}</p>
+      <p className="text-xs text-[var(--ink-soft)] mb-4 tabular-nums">
+        <span className="font-semibold text-[var(--ink)]">{CATEGORIES[p.category]}</span>
+        <span className="mx-1.5">·</span>
+        {p.date}
+      </p>
       <p className="mb-5">{p.intro}</p>
 
       {p.sections.map((s, i) => (
