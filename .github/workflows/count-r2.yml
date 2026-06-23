@@ -1,0 +1,32 @@
+name: count-r2
+
+# R2 적재 검증(읽기 전용). 단지 파일 수·지역 커버리지·표본 거래 날짜 범위를 출력한다.
+# MOLIT quota를 쓰지 않으므로 언제든 안전하게 수동 실행 가능.
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: '거래 날짜 범위를 확인할 표본 단지 수 (0이면 카운트만)'
+        required: false
+        default: '20'
+
+jobs:
+  count-r2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: R2 카운트
+        run: npx tsx scripts/count_r2.ts --sample=${{ inputs.sample }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
