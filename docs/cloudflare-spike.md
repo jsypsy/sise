@@ -49,3 +49,29 @@ pnpm cf:deploy
 
 ## 롤백
 이 브랜치를 버리면 끝. `main`에는 아무 변경 없음.
+
+---
+
+## 부록) 소스 없이 — 브라우저만으로 배포 (Git 연동)
+
+로컬에 코드가 없어도 Cloudflare 대시보드에서 GitHub 레포를 연결해 배포할 수 있다.
+필요한 설정(wrangler.jsonc, open-next.config.ts, 스크립트)은 이미 레포에 들어있음.
+
+1. **dash.cloudflare.com → Workers & Pages → Create → Workers → Connect to Git**
+2. GitHub `jsypsy/sise` 연결, 브랜치 = `claude/cloudflare-spike`(테스트). 나중에 운영은 `main`.
+3. **빌드 설정**
+   - Build command: `npx opennextjs-cloudflare build`
+   - Deploy command: `npx wrangler deploy`
+   - (worker 이름·R2 바인딩은 레포의 `wrangler.jsonc`에서 자동 인식)
+4. **R2 버킷 생성** (한 번): 대시보드 → R2 → Create bucket → 이름 `sise-isr-cache`
+5. **환경변수 등록 ⚠️ "빌드 타임"으로** — `NEXT_PUBLIC_*`는 빌드 시 코드에 인라인되므로 런타임 시크릿이 아니라 **빌드 변수**로 넣어야 함:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_R2_PUBLIC_URL`
+   - `NEXT_PUBLIC_SITE_URL`
+   - (서버 전용이 필요하면) `SUPABASE_SERVICE_ROLE_KEY` 등은 Secret으로
+6. **Save & Deploy** → 빌드 로그 확인 → 생성된 `*.workers.dev` URL에서 테스트
+7. 잘 되면: `main`에 머지 → production 브랜치를 `main`으로 → **Custom Domain(sise.today)** 연결 (광고 ON 직전에)
+
+> 빌드 스크립트는 이 브랜치에서 Turbopack을 빼고 `next build`로 바꿔둠 → OpenNext 변환 호환성 ↑.
+
