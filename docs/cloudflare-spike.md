@@ -47,6 +47,32 @@ pnpm cf:deploy
 - **환경변수**: `NEXT_PUBLIC_*`는 빌드 타임에 인라인됨 → cf:preview/배포 빌드 시점에 값이 있어야 함.
 - **ads.txt / 도메인**: 애드센스는 도메인 기준이라 호스팅 바꿔도 승인 유지. 단 ads.txt를 새 호스트에도 동일하게 올릴 것.
 
+## 런타임 호환성 감사 결과 (app/·lib/ 기준)
+- **Node 전용 API 사용 0** — fs/path/crypto/Buffer/__dirname 등 없음 → Workers 런타임 호환 ✓
+- **service_role 키 불필요** — `createServiceClient`는 lib에 정의만 있고 **app/에서 호출 안 함**. 워커에 `SUPABASE_SERVICE_ROLE_KEY` 넣지 말 것(보안 이득). ingest/스크립트(GitHub Actions)에서만 사용.
+- **aws4fetch(R2 서명)** — scripts/에만. 워커 무관.
+
+### 워커가 실제로 필요로 하는 환경변수 (확정)
+**빌드 변수 (NEXT_PUBLIC_*, 빌드 시 인라인):**
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_R2_PUBLIC_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_ADSENSE_CLIENT`(승인 후)
+
+**런타임 시크릿 (Secret):**
+- `REVALIDATE_SECRET` — `/api/revalidate`(ingest 후 ISR 갱신 트리거)에 필요
+- (선택) `RESEND_API_KEY`, `FEEDBACK_EMAIL_TO`, `FEEDBACK_EMAIL_FROM`, `FEEDBACK_WEBHOOK_URL` — 피드백 폼. 없으면 피드백 저장만(이메일 미발송).
+
+**워커에 넣지 말 것:** `SUPABASE_SERVICE_ROLE_KEY`, `MOLIT_SERVICE_KEY`, R2 액세스 키 — 전부 GitHub Actions 스크립트 전용.
+
+### ⚠️ On-demand ISR 재검증 (전환 전 결정 필요)
+- `/api/revalidate`는 `revalidatePath("/", "layout")`(on-demand)를 호출 — ingest 후 즉시 페이지 갱신용.
+- **Cloudflare/OpenNext에서 on-demand 재검증은 incrementalCache(R2)만으론 부족**하고 **queue + tagCache 추가 설정**(예: D1 tagCache + DO queue)이 필요. 현재 `open-next.config.ts`엔 incrementalCache만 있음.
+- 영향:
+  - **시간기반 ISR(`revalidate=N`)은 R2 캐시로 정상 동작** → 트라이얼/기본 서빙엔 문제 없음.
+  - 단 **on-demand 갱신은 no-op**이 될 수 있어, ingest 직후 즉시 반영이 안 되고 각 페이지 revalidate 주기(홈 86400=24h, 일부 3600=1h)만큼 늦어질 수 있음.
+- 대응(택1, 도메인 전환 전):
+  - **(A)** open-next.config에 D1 tagCache + DO queue 추가 → on-demand 복원(Vercel과 동등, 설정 늘어남).
+  - **(B)** on-demand 의존 제거 + 페이지 revalidate 주기 단축(예: 홈 86400→3600) → 간단하지만 최대 1h 지연.
+- 트라이얼 단계: 그대로 두고 **페이지 서빙 + 시간기반 ISR**만 확인. 전환 전에 (A)/(B) 결정.
+
 ## 롤백
 이 브랜치를 버리면 끝. `main`에는 아무 변경 없음.
 
@@ -69,7 +95,8 @@ pnpm cf:deploy
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `NEXT_PUBLIC_R2_PUBLIC_URL`
    - `NEXT_PUBLIC_SITE_URL`
-   - (서버 전용이 필요하면) `SUPABASE_SERVICE_ROLE_KEY` 등은 Secret으로
+   - `NEXT_PUBLIC_ADSENSE_CLIENT` (승인 후)
+   - **런타임 시크릿**(빌드 변수 아님 → Secret으로): `REVALIDATE_SECRET`(필수), 피드백용 `RESEND_API_KEY` 등(선택). **`SUPABASE_SERVICE_ROLE_KEY`는 넣지 말 것** — 워커가 사용하지 않음(아래 감사 결과 참고).
 6. **Save & Deploy** → 빌드 로그 확인 → 생성된 `*.workers.dev` URL에서 테스트
 7. 잘 되면: `main`에 머지 → production 브랜치를 `main`으로 → **Custom Domain(sise.today)** 연결 (광고 ON 직전에)
 
