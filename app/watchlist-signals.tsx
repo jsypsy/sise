@@ -9,11 +9,19 @@ import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
 import type { Signal } from "@/lib/types";
 
-// 관심단지(localStorage) 중 최근 30일 신고가·반등 시그널을 모아 보여준다.
+type WatchRow = {
+  sgg: string;
+  apt: string;
+  latestPrice: number | null;
+  signal: "high" | "rebound" | null; // 최근 신고가/반등이면 작은 배지로만
+};
+
+// 관심단지(localStorage)를 깔끔한 리스트로. 단지당 한 줄(단지명·지역·최신가),
+// 최근 신고가/반등이 있는 단지에만 작은 배지. (신호 피드 X)
 // 개인화라 정적 생성 불가 → 워치리스트가 있는 방문자만 anon 쿼리 1회.
 export default function WatchlistSignals() {
   const [items, setItems] = useState<WatchItem[]>([]);
-  const [signals, setSignals] = useState<Signal[]>([]);
+  const [rows, setRows] = useState<WatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
 
@@ -28,15 +36,16 @@ export default function WatchlistSignals() {
 
   useEffect(() => {
     if (items.length === 0) {
-      setSignals([]);
+      setRows([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     let cancelled = false;
 
+    // 최근 60일(deal_date) 중개거래로 최신가 + 신호 배지 판정.
     const since = new Date();
-    since.setDate(since.getDate() - 30);
+    since.setDate(since.getDate() - 60);
     const sinceStr = since.toISOString().slice(0, 10);
     const aptNames = [...new Set(items.map((i) => i.apt))];
     const sggCodes = [...new Set(items.map((i) => i.sgg))];
@@ -44,21 +53,42 @@ export default function WatchlistSignals() {
 
     supabase
       .from("signals_mv")
-      .select("*")
+      .select("apt_nm, sgg_cd, price, deal_date, is_high, is_rebound")
       .in("apt_nm", aptNames)
       .in("sgg_cd", sggCodes)
-      .gte("first_seen", sinceStr)
       .eq("dealing_gbn", "중개거래")
-      .or("is_high.eq.true,is_rebound.eq.true")
-      .order("first_seen", { ascending: false })
-      .limit(100)
+      .gte("deal_date", sinceStr)
+      .order("deal_date", { ascending: false })
+      .limit(2000)
       .then(({ data }) => {
         if (cancelled) return;
-        // (apt_nm, sgg_cd) 교차곱 중 실제 담긴 단지만 남긴다.
-        const matched = ((data as Signal[]) ?? []).filter((r) =>
-          wanted.has(`${r.sgg_cd}|${r.apt_nm}`)
+        // 단지별: 최신가(가장 최근 거래) + 신호 여부.
+        const agg = new Map<string, WatchRow>();
+        for (const r of (data ?? []) as Signal[]) {
+          const key = `${r.sgg_cd}|${r.apt_nm}`;
+          if (!wanted.has(key)) continue;
+          let row = agg.get(key);
+          if (!row) {
+            // rows는 deal_date 내림차순 → 첫 등장 = 최신가
+            row = { sgg: r.sgg_cd, apt: r.apt_nm, latestPrice: r.price, signal: null };
+            agg.set(key, row);
+          }
+          if (row.signal === null && (r.is_high || r.is_rebound)) {
+            row.signal = r.is_high ? "high" : "rebound";
+          }
+        }
+        // 담긴 모든 단지를 한 줄씩(최근 거래 없으면 가격/배지 없이).
+        setRows(
+          items.map(
+            (it) =>
+              agg.get(`${it.sgg}|${it.apt}`) ?? {
+                sgg: it.sgg,
+                apt: it.apt,
+                latestPrice: null,
+                signal: null,
+              }
+          )
         );
-        setSignals(matched);
         setLoading(false);
       });
 
@@ -73,53 +103,53 @@ export default function WatchlistSignals() {
   return (
     <section className="mb-6 border border-[var(--line)] rounded-lg p-4">
       <h2 className="text-base font-semibold mb-2">
-        관심단지 시그널
+        관심단지
         <span className="text-xs font-normal text-[var(--ink-soft)] ml-2">
-          최근 30일 · {items.length}개 단지
+          {items.length}개
         </span>
       </h2>
 
       {loading ? (
         <p className="text-sm text-[var(--ink-soft)]">불러오는 중…</p>
-      ) : signals.length === 0 ? (
-        <p className="text-sm text-[var(--ink-soft)]">최근 30일 내 시그널이 없습니다.</p>
       ) : (
-        <ol className="space-y-0">
-          {signals.map((s) => (
+        <ul className="space-y-0">
+          {rows.map((r) => (
             <li
-              key={s.id}
+              key={`${r.sgg}|${r.apt}`}
               className="flex items-baseline gap-2 py-2 border-b border-[var(--line)] last:border-0"
             >
-              <span
-                className={`text-[10px] font-bold rounded px-1 py-0 leading-tight border whitespace-nowrap ${
-                  s.is_high
-                    ? "text-[var(--red)] border-[var(--red)]"
-                    : "text-[var(--gold)] border-[var(--gold)]"
-                }`}
-              >
-                {s.is_high ? "신고가" : "반등"}
-              </span>
               <div className="flex-1 min-w-0">
-                <Link
-                  href={complexHref(s.sgg_cd, s.apt_nm)}
-                  className="font-medium hover:underline truncate block"
-                >
-                  {s.apt_nm}
-                </Link>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Link
+                    href={complexHref(r.sgg, r.apt)}
+                    className="font-medium hover:underline truncate"
+                  >
+                    {r.apt}
+                  </Link>
+                  {r.signal && (
+                    <span
+                      className={`text-[10px] font-bold rounded px-1 py-0 leading-tight border whitespace-nowrap shrink-0 ${
+                        r.signal === "high"
+                          ? "text-[var(--red)] border-[var(--red)]"
+                          : "text-[var(--gold)] border-[var(--gold)]"
+                      }`}
+                    >
+                      {r.signal === "high" ? "신고가" : "반등"}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-[var(--ink-soft)]">
-                  {CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd} · {s.pyeong}평 · {s.deal_date}
+                  {CODE_TO_NAME[r.sgg] ?? r.sgg}
                 </p>
               </div>
-              <span
-                className={`font-medium tabular-nums whitespace-nowrap ${
-                  s.is_high ? "text-[var(--red)]" : "text-[var(--gold)]"
-                }`}
-              >
-                {won(s.price)}
-              </span>
+              {r.latestPrice != null && (
+                <span className="text-sm tabular-nums whitespace-nowrap text-[var(--ink-soft)]">
+                  {won(r.latestPrice)}
+                </span>
+              )}
             </li>
           ))}
-        </ol>
+        </ul>
       )}
     </section>
   );

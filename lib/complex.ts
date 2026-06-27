@@ -109,7 +109,14 @@ export type AptSummary = {
 };
 
 export async function fetchAptsInSgg(sgg: string): Promise<AptSummary[]> {
-  const { data } = await supabase
+  // DB에서 단지별 집계(RPC) → 수천 행 대신 수십 행으로 상세 페이지 가속.
+  const { data, error } = await supabase.rpc("get_apts_in_sgg", { p_sgg_cd: sgg, p_umd: null });
+  if (!error && data) {
+    return (data as AptSummary[]).sort((a, b) => a.apt_nm.localeCompare(b.apt_nm, "ko"));
+  }
+
+  // fallback: RPC 미적용 시 기존 방식
+  const { data: rows } = await supabase
     .from("transactions")
     .select("apt_nm, umd_nm, price, deal_date")
     .eq("sgg_cd", sgg)
@@ -118,7 +125,7 @@ export async function fetchAptsInSgg(sgg: string): Promise<AptSummary[]> {
     .limit(5000);
 
   const groups = new Map<string, AptSummary>();
-  for (const row of (data ?? []) as { apt_nm: string; umd_nm: string | null; price: number; deal_date: string }[]) {
+  for (const row of (rows ?? []) as { apt_nm: string; umd_nm: string | null; price: number; deal_date: string }[]) {
     const g = groups.get(row.apt_nm);
     if (!g) {
       groups.set(row.apt_nm, {

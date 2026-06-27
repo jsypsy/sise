@@ -40,8 +40,17 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 단지 목록: sgg만 있을 때 → 해당 시군구 전체 단지
+  // 단지 목록: sgg(+umd)만 있을 때 → DB에서 단지별 집계(RPC). 수천 행 대신 수십 행.
   if (sgg && !q) {
+    const { data, error } = await supabase.rpc("get_apts_in_sgg", {
+      p_sgg_cd: sgg,
+      p_umd: umd ?? null,
+    });
+    if (!error && data) {
+      const apts = (data as AptRow[]).sort((a, b) => a.apt_nm.localeCompare(b.apt_nm, "ko"));
+      return NextResponse.json(apts);
+    }
+    // fallback: RPC 미적용 시 기존 방식(거래 행 받아 그룹핑)
     let qb = supabase
       .from("transactions")
       .select("apt_nm, sgg_cd, umd_nm, price, deal_date")
@@ -50,8 +59,8 @@ export async function GET(req: NextRequest) {
       .order("deal_date", { ascending: false })
       .limit(5000);
     if (umd) qb = qb.eq("umd_nm", umd);
-    const { data } = await qb;
-    const apts = groupApts(data ?? []).sort((a, b) => a.apt_nm.localeCompare(b.apt_nm, "ko"));
+    const { data: rows } = await qb;
+    const apts = groupApts(rows ?? []).sort((a, b) => a.apt_nm.localeCompare(b.apt_nm, "ko"));
     return NextResponse.json(apts);
   }
 
