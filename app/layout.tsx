@@ -38,7 +38,12 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
   },
   robots: { index: true, follow: true },
-  verification: { google: "RVStMsSALhHJvRb6yvbbzef6egjo539sTPM_T8zS6iU" },
+  verification: {
+    google: "RVStMsSALhHJvRb6yvbbzef6egjo539sTPM_T8zS6iU",
+    // AdSense 소유권 인증 — ADSENSE_CLIENT(ca-pub-…) 설정 시 SSR <head>에
+    // <meta name="google-adsense-account">로 출력돼 심사 인증이 확실해진다.
+    ...(ADSENSE_CLIENT ? { other: { "google-adsense-account": ADSENSE_CLIENT } } : {}),
+  },
 };
 
 export default function RootLayout({
