@@ -102,3 +102,6 @@ pnpm cf:deploy
 
 > 빌드 스크립트는 이 브랜치에서 Turbopack을 빼고 `next build`로 바꿔둠 → OpenNext 변환 호환성 ↑.
 
+
+> 팁: Cloudflare에서 **production 브랜치를 바꾼 뒤**엔 "Retry deployment"(이전 빌드 재실행)로는
+> 새 브랜치가 안 빌드된다. 그 브랜치에 **새 커밋이 푸시될 때** 새 빌드가 자동으로 돈다.
