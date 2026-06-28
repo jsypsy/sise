@@ -47,11 +47,17 @@ export async function fetchComplex(sgg: string, apt: string): Promise<RawComplex
 // R2는 fetch_peaks 주기(최대 8일) 스냅샷이라 그 이후 신고된 최신 거래가 빠진다.
 // 매일 ingest가 채우는 DB로 이 공백을 메운다. anon read(RLS 허용)로 충분.
 async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
+  // R2 스냅샷(fetch_peaks 주기 최대 8일) 이후 새로 등록된 거래만 받으면 된다.
+  // 전체 이력은 R2에 있으므로, DB에선 최근 first_seen만 → 대형 단지에서 수천 건 → 수십 건.
+  const since = new Date();
+  since.setDate(since.getDate() - 21);
+  const sinceStr = since.toISOString().slice(0, 10);
   const { data } = await supabase
     .from("transactions")
     .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled")
     .eq("sgg_cd", sgg)
     .eq("apt_nm", apt)
+    .gte("first_seen", sinceStr)
     .limit(3000);
   return (data ?? []).map((r) => ({
     d: r.deal_date as string,
