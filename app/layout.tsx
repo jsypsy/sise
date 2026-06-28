@@ -11,6 +11,9 @@ const gowun = Gowun_Batang({
   subsets: ["latin"],
   variable: "--font-gowun",
   display: "swap",
+  // 로고("시세") 2글자에만 쓰는데, 한글 세리프라 서브셋 woff2가 수십 개로 쪼개짐.
+  // preload하면 매 페이지 17개+ 폰트를 한꺼번에 받음 → 끄고 실제 쓰는 글자만 lazy.
+  preload: false,
 });
 
 const DEFAULT_TITLE = "시세 — 아파트 실거래 시그널";
