@@ -66,6 +66,19 @@ function currentYm(): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// hp(시그널 전고점 baseline)에는 '라이브 윈도우'(ingest가 매일 긁는 최근 3개월) 거래를
+// 넣지 않는다. signals_mv가 그 구간은 transactions에서 직접 계산하므로, hp에 같이 넣으면
+// 현재월 거래가 자기 자신을 전고점으로 만들어 진짜 신고가를 억누른다(self-inclusion).
+// ingest 윈도우(당월·전월·전전월)와 동일하게 전전월 1일 이후 deal_date는 hp 갱신에서 스킵.
+// → 수동(to=현재월 직전)이든 스케줄(to=현재월)이든 hp 결과가 동일해지고, 밤마다 도는
+//   cron이 재구축 결과를 self-inclusion으로 되돌리지 않는다.
+function peakCutoffYmd(): string {
+  const d = new Date();
+  const cut = new Date(d.getFullYear(), d.getMonth() - 2, 1);
+  return `${cut.getFullYear()}-${String(cut.getMonth() + 1).padStart(2, "0")}-01`;
+}
+const PEAK_CUTOFF = peakCutoffYmd();
+
 function monthRange(from: string, to: string): string[] {
   const months: string[] = [];
   let ym = from;
@@ -152,9 +165,10 @@ async function fetchRegion(
             fl: r.floor, g: r.dealing_gbn, c: r.canceled,
           });
 
-          // ── peaks 갱신 (취소·직거래 제외 — 시그널 전고점은 중개거래 기준) ──────
+          // ── peaks 갱신 (취소·직거래·라이브 윈도우 제외 — 시그널 전고점은 중개거래 기준) ──
           // 동명단지(③) 분리: 그룹 키에 umd_nm 포함(NULL은 '' 버킷, hp 저장과 일치).
-          if (r.canceled || r.dealing_gbn === "직거래") continue;
+          // 라이브 윈도우(최근 3개월)는 hp에서 제외 — self-inclusion 방지(위 PEAK_CUTOFF 주석).
+          if (r.canceled || r.dealing_gbn === "직거래" || r.deal_date >= PEAK_CUTOFF) continue;
           const umd      = r.umd_nm ?? "";
           const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${umd}|${r.pyeong}`;
           const existing = peaks.get(peakKey);

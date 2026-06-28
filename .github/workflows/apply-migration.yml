@@ -1,0 +1,31 @@
+# 마이그레이션 1개를 새(서울) Supabase에 서버-투-서버로 적용한다.
+# Supabase SQL Editor 복붙을 대체 — Actions에서 psql로 직접 실행한다.
+# 사용법: Actions → "apply-migration (one-off)" → 파일명 입력 → Run.
+#   migration = supabase/migrations 내 파일명 (예: 0018_group_by_umd.sql)
+# 전제: NEW_DB_URL 시크릿(서울 프로젝트 Session pooler 연결 문자열, 비밀번호 포함)이 있어야 함.
+# 안전: ON_ERROR_STOP=1 — 한 줄이라도 실패하면 즉시 비정상 종료. 시크릿은 로그에서 자동 마스킹.
+name: apply-migration (one-off)
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: 'supabase/migrations 내 파일명 (예: 0018_group_by_umd.sql)'
+        required: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply migration to NEW_DB_URL
+        run: |
+          F="supabase/migrations/${{ inputs.migration }}"
+          if [ ! -f "$F" ]; then
+            echo "::error::파일 없음: $F"
+            exit 1
+          fi
+          echo "applying $F ..."
+          psql -v ON_ERROR_STOP=1 "${{ secrets.NEW_DB_URL }}" -f "$F"
+          echo "applied: $F"
