@@ -70,7 +70,7 @@ CREATE OR REPLACE FUNCTION archive_expired_transactions()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-AS $$
+AS $archive$
 DECLARE
   cutoff_date date;
 BEGIN
@@ -110,6 +110,6 @@ BEGIN
 
   DELETE FROM transactions WHERE first_seen < cutoff_date;
 END;
-$$;
+$archive$;
 
 GRANT EXECUTE ON FUNCTION archive_expired_transactions() TO service_role;
