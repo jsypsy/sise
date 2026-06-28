@@ -1,0 +1,55 @@
+# 일회성 DB 데이터 이관 (옛 Supabase → 새 Supabase). 로컬 설치 불필요.
+# 사용법:
+#   1) 두 프로젝트의 "Session pooler" 연결 문자열을 GitHub 시크릿으로 추가:
+#        OLD_DB_URL = 옛(뭄바이) 연결 문자열 (비밀번호 포함)
+#        NEW_DB_URL = 새(서울) 연결 문자열 (비밀번호 포함)
+#      (Supabase → Settings → Database → Connection string → Session pooler)
+#   2) 새 프로젝트엔 스키마가 이미 있어야 함(마이그레이션 0001~0015 실행 완료).
+#   3) Actions → "migrate-db (one-off)" → Run workflow.
+#   4) 로그에서 OLD/NEW transactions count가 같은지 확인.
+# 안전: 옛 DB는 읽기만, 새 DB에 쓰기. 시크릿은 로그에서 자동 마스킹됨.
+name: migrate-db (one-off)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          pg_dump --version
+
+      - name: Counts before
+        run: |
+          echo "OLD transactions: $(psql "${{ secrets.OLD_DB_URL }}" -tAc 'select count(*) from transactions;')"
+          echo "NEW transactions (before): $(psql "${{ secrets.NEW_DB_URL }}" -tAc 'select count(*) from transactions;')"
+
+      - name: Dump (old) and restore (new)
+        run: |
+          pg_dump --data-only --no-owner --no-privileges \
+            -t public.transactions -t public.historical_peaks -t public.feedback \
+            "${{ secrets.OLD_DB_URL }}" > sise_data.sql
+          echo "dump lines: $(wc -l < sise_data.sql)"
+          psql -v ON_ERROR_STOP=1 "${{ secrets.NEW_DB_URL }}" -f sise_data.sql
+
+      - name: Refresh materialized view (new)
+        run: psql "${{ secrets.NEW_DB_URL }}" -c "refresh materialized view signals_mv;"
+
+      - name: Counts after (verify — OLD and NEW should match)
+        run: |
+          echo "OLD transactions:     $(psql "${{ secrets.OLD_DB_URL }}" -tAc 'select count(*) from transactions;')"
+          echo "NEW transactions:     $(psql "${{ secrets.NEW_DB_URL }}" -tAc 'select count(*) from transactions;')"
+          echo "NEW historical_peaks: $(psql "${{ secrets.NEW_DB_URL }}" -tAc 'select count(*) from historical_peaks;')"
+          echo "NEW feedback:         $(psql "${{ secrets.NEW_DB_URL }}" -tAc 'select count(*) from feedback;')"
+          echo "NEW signals_mv:       $(psql "${{ secrets.NEW_DB_URL }}" -tAc 'select count(*) from signals_mv;')"
