@@ -154,7 +154,9 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
                   {deal.c ? (
                     <span className="text-[var(--ink-soft)]">취소</span>
                   ) : deal.g === "직거래" ? (
-                    <span className="text-[var(--blue)]">직</span>
+                    <span className="inline-block text-[10px] font-bold text-[var(--blue)] border border-[var(--blue)] rounded px-1 py-0 leading-tight align-middle">
+                      직거래
+                    </span>
                   ) : null}
                 </td>
                 <td className="py-1.5 text-right text-xs">
