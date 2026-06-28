@@ -152,8 +152,8 @@ async function fetchRegion(
             fl: r.floor, g: r.dealing_gbn, c: r.canceled,
           });
 
-          // ── peaks 갱신 (취소거래 제외) ───────────────────────────────────
-          if (r.canceled) continue;
+          // ── peaks 갱신 (취소·직거래 제외 — 시그널 전고점은 중개거래 기준) ──────
+          if (r.canceled || r.dealing_gbn === "직거래") continue;
           const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${r.pyeong}`;
           const existing = peaks.get(peakKey);
           if (!existing || r.price > existing.peak_price) {
