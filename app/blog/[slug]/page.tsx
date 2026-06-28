@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { POSTS, POSTS_SORTED, getPost } from "@/lib/blog";
 import { SITE_URL } from "@/lib/site";
+import { jsonLdString } from "@/lib/jsonld";
 
 type Params = Promise<{ slug: string }>;
 
@@ -86,7 +87,7 @@ export default async function BlogPostPage({ params }: { params: Params }) {
         </p>
       </div>
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
     </article>
   );
 }

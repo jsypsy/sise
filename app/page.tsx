@@ -23,7 +23,7 @@ async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
   since.setDate(since.getDate() - 7);
   const sinceStr = since.toISOString().slice(0, 10);
 
-  const [{ data: highs }, { data: rebounds }] = await Promise.all([
+  const [{ data: highs, error: e1 }, { data: rebounds, error: e2 }] = await Promise.all([
     supabase
       .from("signals_mv")
       .select("*")
@@ -41,6 +41,8 @@ async function fetchTop(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
       .order("price", { ascending: false })
       .limit(5),
   ]);
+
+  if (e1 || e2) console.error("[home] signals_mv 조회 오류:", e1?.message, e2?.message);
 
   return {
     highs: (highs as Signal[]) ?? [],

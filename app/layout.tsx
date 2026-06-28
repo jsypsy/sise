@@ -75,11 +75,16 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="border-t border-[var(--line)] py-3 text-xs text-[var(--ink-soft)]">
-          <div className="max-w-4xl mx-auto px-4 w-full flex flex-wrap gap-x-3 gap-y-1">
-            <Link href="/guide" className="hover:underline">가이드</Link>
-            <Link href="/about" className="hover:underline">소개</Link>
-            <Link href="/privacy" className="hover:underline">개인정보처리방침</Link>
-            <Link href="/feedback" className="hover:underline">의견 보내기</Link>
+          <div className="max-w-4xl mx-auto px-4 w-full">
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <Link href="/guide" className="hover:underline">가이드</Link>
+              <Link href="/about" className="hover:underline">소개</Link>
+              <Link href="/privacy" className="hover:underline">개인정보처리방침</Link>
+              <Link href="/feedback" className="hover:underline">의견 보내기</Link>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-soft)]">
+              국토교통부 실거래가 공개시스템 기반 · 정부 공식 서비스가 아니며 정확성을 보장하지 않습니다 · 평형은 추정치
+            </p>
           </div>
         </footer>
 

@@ -13,11 +13,12 @@ export default function MainSearch() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} role="search" className="flex gap-2">
       <input
         type="text"
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        aria-label="단지명 검색"
         placeholder="단지명 검색 (예: 래미안, 자이…)"
         className="flex-1 border border-[var(--line)] rounded px-3 py-2 text-sm bg-[var(--paper)] focus:outline-none focus:border-[var(--ink-soft)]"
       />

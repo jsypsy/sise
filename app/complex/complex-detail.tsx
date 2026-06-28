@@ -134,7 +134,7 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
             {pagedDeals.map((deal, i) => (
               <tr
                 key={i}
-                className={`border-b border-[var(--line)] hover:bg-[var(--paper-2)] ${deal.c ? "opacity-40" : ""}`}
+                className={`border-b border-[var(--line)] hover:bg-[var(--paper-2)] ${deal.c ? "text-[var(--ink-soft)] line-through" : ""}`}
               >
                 <td className="py-1.5 pr-3 text-xs">{deal.d}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap">

@@ -22,7 +22,7 @@ function sinceStr(): string {
 // 기본(전국·최근7일) TOP을 서버에서 ISR로 — 크롤러가 초기 HTML에서 목록을 본다.
 async function fetchTopDefault(): Promise<{ highs: Signal[]; rebounds: Signal[] }> {
   const since = sinceStr();
-  const [{ data: h }, { data: r }] = await Promise.all([
+  const [{ data: h, error: e1 }, { data: r, error: e2 }] = await Promise.all([
     supabase
       .from("signals_mv").select("*")
       .gte("first_seen", since).eq("dealing_gbn", "중개거래").eq("is_high", true)
@@ -32,6 +32,7 @@ async function fetchTopDefault(): Promise<{ highs: Signal[]; rebounds: Signal[] 
       .gte("first_seen", since).eq("dealing_gbn", "중개거래").eq("is_rebound", true)
       .order("price", { ascending: false }).limit(10),
   ]);
+  if (e1 || e2) console.error("[top] signals_mv 조회 오류:", e1?.message, e2?.message);
   return { highs: (h as Signal[]) ?? [], rebounds: (r as Signal[]) ?? [] };
 }
 

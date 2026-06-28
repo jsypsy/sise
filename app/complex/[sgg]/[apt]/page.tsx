@@ -8,12 +8,22 @@ import { won } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
 import ComplexDetail from "../../complex-detail";
 import WatchButton from "../../../watch-button";
+import { jsonLdString } from "@/lib/jsonld";
 
 type Params = Promise<{ sgg: string; apt: string }>;
 
+// URL 파라미터에 잘못된 %인코딩이 와도 500 대신 원본을 쓰도록 안전 디코드.
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { sgg, apt: aptRaw } = await params;
-  const apt = decodeURIComponent(aptRaw);
+  const apt = safeDecode(aptRaw);
   const cx = await fetchComplexMerged(sgg, apt);
   if (!cx) {
     return { title: { absolute: `${apt} 실거래가 | 시세` }, robots: { index: false } };
@@ -34,7 +44,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function ComplexDetailPage({ params }: { params: Params }) {
   const { sgg, apt: aptRaw } = await params;
-  const apt = decodeURIComponent(aptRaw);
+  const apt = safeDecode(aptRaw);
   // 단지 본체와 '관련 단지' 목록을 병렬로 — 서로 의존 없음.
   const [cx, inSgg] = await Promise.all([
     fetchComplexMerged(sgg, apt),
@@ -120,7 +130,7 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
         <Link href="/complex" className="hover:underline">다른 단지 조회 →</Link>
       </p>
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
     </div>
   );
 }
