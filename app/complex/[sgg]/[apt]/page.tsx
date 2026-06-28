@@ -35,14 +35,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function ComplexDetailPage({ params }: { params: Params }) {
   const { sgg, apt: aptRaw } = await params;
   const apt = decodeURIComponent(aptRaw);
-  const cx = await fetchComplexMerged(sgg, apt);
+  // 단지 본체와 '관련 단지' 목록을 병렬로 — 서로 의존 없음.
+  const [cx, inSgg] = await Promise.all([
+    fetchComplexMerged(sgg, apt),
+    fetchAptsInSgg(sgg),
+  ]);
   if (!cx) notFound();
 
   const loc = locationLabel(sgg, cx.umd_nm);
   const s = summarize(cx.deals);
 
   // 같은 동(없으면 같은 시군구) 다른 단지 — 내부 링크 + 탐색.
-  const inSgg = await fetchAptsInSgg(sgg);
   const related = (cx.umd_nm ? inSgg.filter((a) => a.umd_nm === cx.umd_nm) : inSgg)
     .filter((a) => a.apt_nm !== cx.apt_nm)
     .sort((a, b) => b.tx_count - a.tx_count)

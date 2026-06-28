@@ -75,11 +75,14 @@ function mergeDeals(r2: RawDeal[], recent: RawDeal[]): RawDeal[] {
 }
 
 // R2 전체이력 + DB 최근 거래를 병합한 단지 1개. 요청 내 중복 호출은 cache로 dedupe.
+// R2 fetch와 DB 최근거래를 병렬로(둘 다 같은 apt를 키로 쓰므로 의존 없음).
 export const fetchComplexMerged = cache(
   async (sgg: string, apt: string): Promise<RawComplex | null> => {
-    const cx = await fetchComplex(sgg, apt);
+    const [cx, recent] = await Promise.all([
+      fetchComplex(sgg, apt),
+      fetchRecentDeals(sgg, apt),
+    ]);
     if (!cx) return null;
-    const recent = await fetchRecentDeals(sgg, cx.apt_nm);
     return { ...cx, deals: mergeDeals(cx.deals, recent) };
   }
 );
