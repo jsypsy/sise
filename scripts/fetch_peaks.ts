@@ -22,7 +22,7 @@ try { process.loadEnvFile(".env.local"); } catch { /* noop */ }
 
 const parser = new XMLParser();
 
-type Peak = { apt_nm: string; sgg_cd: string; pyeong: number; peak_price: number; peak_date: string };
+type Peak = { apt_nm: string; sgg_cd: string; umd_nm: string; pyeong: number; peak_price: number; peak_date: string };
 
 /** raw 파일의 거래 1건 (키 축약으로 용량 절감) */
 type RawDeal = {
@@ -153,12 +153,14 @@ async function fetchRegion(
           });
 
           // ── peaks 갱신 (취소·직거래 제외 — 시그널 전고점은 중개거래 기준) ──────
+          // 동명단지(③) 분리: 그룹 키에 umd_nm 포함(NULL은 '' 버킷, hp 저장과 일치).
           if (r.canceled || r.dealing_gbn === "직거래") continue;
-          const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${r.pyeong}`;
+          const umd      = r.umd_nm ?? "";
+          const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${umd}|${r.pyeong}`;
           const existing = peaks.get(peakKey);
           if (!existing || r.price > existing.peak_price) {
             peaks.set(peakKey, {
-              apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, pyeong: r.pyeong,
+              apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, umd_nm: umd, pyeong: r.pyeong,
               peak_price: r.price, peak_date: r.deal_date,
             });
           }
