@@ -111,6 +111,18 @@ async function ingestSggYm(
         .upsert(rows, { onConflict: "raw_key", ignoreDuplicates: true });
       if (error) console.error(`  [${sgg_cd}/${ym}] upsert 오류:`, error.message);
       else upserted += rows.length;
+
+      // 취소 갱신: insert-only upsert는 기존 행을 안 건드리므로, 나중에 취소로
+      // 바뀐 거래(canceled=false→true)가 반영되지 않는다. 취소 행만 모아 bulk
+      // update — first_seen은 보존, 이미 취소된 행은 RPC 내부 가드로 no-op.
+      const canceledRows = rows
+        .filter(r => r.canceled)
+        .map(r => ({ raw_key: r.raw_key, cdeal_day: r.cdeal_day }));
+      if (canceledRows.length) {
+        const { data: flipped, error: cErr } = await db.rpc("apply_cancellations", { rows: canceledRows });
+        if (cErr) console.error(`  [${sgg_cd}/${ym}] 취소 갱신 오류:`, cErr.message);
+        else if (flipped) console.log(`  [${sgg_cd}/${ym}] 취소 갱신 ${flipped}건`);
+      }
     }
 
     fetched += items.length;
