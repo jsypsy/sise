@@ -86,12 +86,17 @@ function monthRange(from: string, to: string): string[] {
   return months;
 }
 
+// 전국 수집의 quota-aware 조기 종료용 공유 상태. (ingest.ts의 consecutive429 패턴을
+// 동시성 버전으로 옮긴 것 — quota가 소진되면 남은 지역을 갈지 않고 즉시 멈춘다.)
+type RunState = { aborted: boolean; hard429: number };
+
 async function fetchWithRetry(url: string, sgg_cd: string, ym: string, attempt = 0): Promise<Response> {
   const res = await fetch(url);
-  if (res.status === 429 && attempt < 5) {
-    // 429: 첫 번째는 60s, 이후 2배씩 (60/120/240/480/960s)
-    const wait = 60000 * Math.pow(2, attempt);
-    console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/5)`);
+  // 429 백오프는 '일시적' rate-limit용으로만 짧게(30/60/120s, 3회). quota 소진 상황에선
+  // 길게 기다려봐야 계속 429라 시간 낭비 → 짧게 끊고 호출부가 hard429로 조기 종료를 판단.
+  if (res.status === 429 && attempt < 3) {
+    const wait = 30000 * Math.pow(2, attempt); // 30s, 60s, 120s
+    console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/3)`);
     await new Promise(r => setTimeout(r, wait));
     return fetchWithRetry(url, sgg_cd, ym, attempt + 1);
   }
@@ -104,8 +109,10 @@ async function fetchRegion(
   peaks: Map<string, Peak>,
   complexes: Map<string, RawComplex>,
   molitKey: string,
+  state: RunState,
 ): Promise<void> {
   for (const ym of months) {
+    if (state.aborted) return; // quota 소진 감지 시 남은 달 즉시 중단
     try {
       let pageNo = 1, totalCount = 0, fetched = 0;
       do {
@@ -119,6 +126,15 @@ async function fetchRegion(
         url.searchParams.set("numOfRows", "1000");
 
         const res = await fetchWithRetry(url.toString(), sgg_cd, ym);
+        if (res.status === 429) {
+          // 재시도 후에도 429 = quota 소진 가능성. 누적해서 임계 넘으면 전체 조기 종료.
+          // (성공하면 아래에서 0으로 리셋 → 흩어진 일시적 429로는 종료되지 않음)
+          if (++state.hard429 >= 6) {
+            state.aborted = true;
+            console.error("연속 429 다수 — 일일 quota 소진 추정. 수집 조기 종료(수집분은 그대로 업서트).");
+          }
+          return;
+        }
         if (!res.ok) break;
 
         const parsed = parser.parse(await res.text());
@@ -126,8 +142,9 @@ async function fetchRegion(
         // (헤더가 없으면 NaN → 정상으로 간주하고 body로 데이터 유무를 판정)
         const rc = parseInt(String(parsed?.response?.header?.resultCode ?? "0"), 10);
         if (rc === 22) {
-          // 일일 quota 소진 — 이 지역의 남은 달 중단 (누적 데이터는 그대로 유지)
-          console.warn(`  [${sgg_cd}] resultCode=22 — quota 소진. 배치 중단.`);
+          // 일일 quota 소진(확정) — 전체 조기 종료. 누적 데이터는 그대로 업서트된다.
+          console.warn(`  [${sgg_cd}] resultCode=22 — quota 소진. 수집 조기 종료.`);
+          state.aborted = true;
           return;
         }
         if (rc !== 0 && rc !== 3 && !Number.isNaN(rc)) {
@@ -135,6 +152,7 @@ async function fetchRegion(
           console.warn(`  [${sgg_cd}/${ym}] resultCode=${rc} — 건너뜀`);
           break;
         }
+        state.hard429 = 0; // 정상 응답 — 연속 429 카운터 리셋
 
         const body = parsed?.response?.body;
         if (!body) break;
@@ -244,11 +262,16 @@ async function main() {
 
   const peaks     = new Map<string, Peak>();
   const complexes = new Map<string, RawComplex>();
+  const state: RunState = { aborted: false, hard429: 0 };
 
   const CONCURRENCY = 3;
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
+    if (state.aborted) {
+      console.warn(`\nquota 소진으로 남은 ${targets.length - i}개 지역 건너뜀 — 수집분만 반영한다.`);
+      break;
+    }
     const batch = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(batch.map(sgg_cd => fetchRegion(sgg_cd, months, peaks, complexes, molitKey)));
+    await Promise.all(batch.map(sgg_cd => fetchRegion(sgg_cd, months, peaks, complexes, molitKey, state)));
     process.stdout.write(
       `  ${Math.min(i + CONCURRENCY, targets.length)}/${targets.length} 지역 완료 (단지 ${complexes.size}개)\r`
     );
