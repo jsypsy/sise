@@ -12,3 +12,8 @@ export const SITE_DESCRIPTION =
 // Google AdSense 퍼블리셔 ID(ca-pub-XXXXXXXX). 미설정이면 광고 스크립트·슬롯이 전부 비활성.
 // 승인 후 Vercel/Cloudflare 환경변수 NEXT_PUBLIC_ADSENSE_CLIENT에 주입하면 켜진다.
 export const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "";
+
+// Google Analytics 4 측정 ID(G-XXXXXXXXXX). 미설정이면 분석 스크립트가 전혀 로드되지 않는다.
+// 측정 ID는 공개값이라 NEXT_PUBLIC_ 노출 OK(서비스 키와 달리 비밀이 아님).
+// 환경변수 NEXT_PUBLIC_GA_ID에 주입하면 켜진다(프로덕션 env에만 넣으면 프리뷰는 자동 제외).
+export const GA_ID = process.env.NEXT_PUBLIC_GA_ID ?? "";

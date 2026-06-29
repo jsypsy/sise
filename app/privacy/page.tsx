@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const UPDATED = "2026-06-14";
+const UPDATED = "2026-06-29";
 
 export default function PrivacyPage() {
   return (
@@ -48,9 +48,19 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="4. 방문 분석">
-        서비스 개선을 위해 방문 통계 분석 도구를 사용할 수 있습니다. 해당 도구는 개인을
-        식별하지 않는 집계 통계(방문 수, 페이지 조회 등)만을 수집합니다.
+      <Section title="4. 방문 분석 (Google Analytics)">
+        서비스 개선을 위해 <b>Google Analytics 4</b>를 사용합니다. 이 도구는 쿠키 또는 유사 기술로 방문 수,
+        페이지 조회, 기기·브라우저 종류, 대략적 접속 지역 등 개인을 식별하지 않는 집계 통계를 수집합니다.
+        <ul className="list-disc pl-5 mt-2 space-y-1">
+          <li>
+            Google의 데이터 사용 안내:{" "}
+            <ExtLink href="https://policies.google.com/privacy">policies.google.com/privacy</ExtLink>
+          </li>
+          <li>
+            Google Analytics 수집 거부(브라우저 부가기능):{" "}
+            <ExtLink href="https://tools.google.com/dlpage/gaoptout">tools.google.com/dlpage/gaoptout</ExtLink>
+          </li>
+        </ul>
       </Section>
 
       <Section title="5. 데이터 출처 및 면책">

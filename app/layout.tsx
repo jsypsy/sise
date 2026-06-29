@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Gowun_Batang } from "next/font/google";
 import "./globals.css";
 import Nav from "./nav";
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, ADSENSE_CLIENT } from "@/lib/site";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, ADSENSE_CLIENT, GA_ID } from "@/lib/site";
 
 const gowun = Gowun_Batang({
   weight: ["400", "700"],
@@ -95,6 +95,21 @@ export default function RootLayout({
             crossOrigin="anonymous"
             strategy="afterInteractive"
           />
+        )}
+
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_ID}');`}
+            </Script>
+          </>
         )}
       </body>
     </html>
