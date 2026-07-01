@@ -1,0 +1,64 @@
+# 단지 1개의 데이터 실태를 진단한다(읽기 전용): R2 전체이력 + DB 최근/전고점.
+# 평형별 최고가를 (전체 / 취소제외 / 중개거래만)로 쪼개 보여줘 아실 등과의 차이 원인을 찾는다.
+# 사용법: Actions → "inspect-complex" → sgg, apt 입력 → Run.
+name: inspect-complex (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sgg:
+        description: '시군구 코드 (예: 11740)'
+        required: true
+      apt:
+        description: '단지명 (예: 올림픽파크포레온)'
+        required: true
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: R2 전체이력 분석
+        env:
+          R2_BASE: https://pub-bad2ec689072415f9b9c1fec760c3ed5.r2.dev
+          SGG: ${{ inputs.sgg }}
+          APT: ${{ inputs.apt }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request, gzip, json, io
+          base, sgg, apt = os.environ["R2_BASE"], os.environ["SGG"], os.environ["APT"]
+          url = f"{base}/{sgg}/{urllib.parse.quote(apt)}.json"
+          print("R2 URL:", url)
+          try:
+              raw = urllib.request.urlopen(url, timeout=30).read()
+          except Exception as e:
+              print("R2 fetch 실패:", e); raise SystemExit(0)
+          if raw[:2] == b"\x1f\x8b": raw = gzip.decompress(raw)
+          cx = json.loads(raw)
+          deals = cx.get("deals", [])
+          print(f"umd_nm={cx.get('umd_nm')}  build_year={cx.get('build_year')}  총 거래={len(deals)}")
+          # 평형별 최고가 (전체 / 취소제외 / 중개거래만)
+          from collections import defaultdict
+          agg = defaultdict(lambda: {"all":0,"nocxl":0,"broker":0,"n":0})
+          for d in deals:
+              py=d["py"]; p=d["p"]; a=agg[py]; a["n"]+=1
+              a["all"]=max(a["all"],p)
+              if not d.get("c"): a["nocxl"]=max(a["nocxl"],p)
+              if not d.get("c") and d.get("g")=="중개거래": a["broker"]=max(a["broker"],p)
+          print("\n평형 | 거래수 | 최고가(전체) | 최고가(취소제외) | 최고가(중개만)  [만원]")
+          for py in sorted(agg):
+              a=agg[py]
+              print(f"  {py:>3} | {a['n']:>5} | {a['all']:>11,} | {a['nocxl']:>13,} | {a['broker']:>12,}")
+          # 33~34평(84타입) 상위 거래 상세
+          print("\n[33~34평 상위 10건] 날짜 | 가격(만원) | 평 | 층 | 유형 | 취소")
+          sub=[d for d in deals if d["py"] in (33,34)]
+          for d in sorted(sub, key=lambda x:-x["p"])[:10]:
+              print(f"  {d['d']} | {d['p']:>9,} | {d['py']} | {d.get('fl')} | {d.get('g')} | {d.get('c')}")
+          PY
+
+      - name: DB 최근거래 + 전고점
+        run: |
+          DB="${{ secrets.NEW_DB_URL }}"
+          echo "── transactions(핫윈도우) 최근 거래 33~34평 ──"
+          psql "$DB" -c "select deal_date, price, pyeong, floor, dealing_gbn, canceled, first_seen from transactions where sgg_cd='${{ inputs.sgg }}' and apt_nm='${{ inputs.apt }}' and pyeong in (33,34) order by price desc limit 15;"
+          echo "── historical_peaks(전고점 baseline) ──"
+          psql "$DB" -c "select umd_nm, pyeong, peak_price, peak_date from historical_peaks where sgg_cd='${{ inputs.sgg }}' and apt_nm='${{ inputs.apt }}' order by pyeong;"
