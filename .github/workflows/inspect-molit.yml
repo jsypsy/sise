@@ -1,0 +1,66 @@
+# MOLIT 원본을 특정 시군구·계약월로 직접 조회해 거래 유형(중개/직거래)·취소 여부를 확인한다.
+# 아실 등 외부와 최고가가 다를 때 "직거래/취소 제외 정책 때문인지 vs 우리가 놓친 건지" 판별용.
+# 사용법: Actions → "inspect-molit" → sgg, ym(YYYYMM), apt, (선택)면적범위 입력 → Run.
+name: inspect-molit (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sgg:
+        description: '시군구 코드 (예: 11740)'
+        required: true
+      ym:
+        description: '계약년월 YYYYMM (예: 202510)'
+        required: true
+      apt:
+        description: '단지명 필터 (부분일치, 예: 올림픽파크포레온)'
+        required: true
+      amin:
+        description: '전용면적 최소 (예: 80)'
+        required: false
+        default: '0'
+      amax:
+        description: '전용면적 최대 (예: 90)'
+        required: false
+        default: '9999'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: MOLIT 원본 조회
+        env:
+          MOLIT_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+          SGG: ${{ inputs.sgg }}
+          YM: ${{ inputs.ym }}
+          APT: ${{ inputs.apt }}
+          AMIN: ${{ inputs.amin }}
+          AMAX: ${{ inputs.amax }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+          key=os.environ["MOLIT_KEY"]; sgg=os.environ["SGG"]; ym=os.environ["YM"]
+          apt=os.environ["APT"]; amin=float(os.environ["AMIN"]); amax=float(os.environ["AMAX"])
+          q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"1000"})
+          url="https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?"+q
+          xml=urllib.request.urlopen(url,timeout=30).read()
+          root=ET.fromstring(xml)
+          rc=(root.findtext(".//resultCode") or "?"); print("resultCode:",rc,"(0/00=정상, 22=quota)")
+          rows=[]
+          for it in root.iter("item"):
+              nm=(it.findtext("aptNm") or "").strip()
+              if apt not in nm: continue
+              area=float((it.findtext("excluUseAr") or "0").strip() or 0)
+              if not (amin<=area<=amax): continue
+              amt=int((it.findtext("dealAmount") or "0").replace(",","").strip() or 0)
+              d=f"{(it.findtext('dealYear') or '').strip()}-{(it.findtext('dealMonth') or '').strip().zfill(2)}-{(it.findtext('dealDay') or '').strip().zfill(2)}"
+              rows.append((amt, d, area, (it.findtext('floor') or '').strip(),
+                           (it.findtext('dealingGbn') or '').strip(),
+                           (it.findtext('cdealType') or '').strip(),
+                           (it.findtext('umdNm') or '').strip()))
+          rows.sort(key=lambda x:-x[0])
+          print(f"\n{apt} · {ym} · 전용 {amin}~{amax}㎡ · {len(rows)}건")
+          print("가격(만원) | 계약일 | 전용㎡ | 층 | 유형 | 취소(O=해제) | 동")
+          for amt,d,area,fl,gbn,cdt,umd in rows:
+              print(f"  {amt:>9,} | {d} | {area:>6.2f} | {fl:>3} | {gbn or '중개거래'} | {cdt or '-'} | {umd}")
+          PY
