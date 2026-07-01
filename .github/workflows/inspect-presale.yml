@@ -1,0 +1,68 @@
+# 국토부 아파트 분양권/입주권 전매(RTMSDataSvcSilvTrade) API를 찔러 스키마·권한·데이터를 확인한다.
+# 매매 API 외 입주권 거래를 수집할지 결정하기 위한 사전 probe(읽기 전용).
+# 사용법: Actions → "inspect-presale" → sgg, ym(YYYYMM), apt(부분일치) 입력 → Run.
+name: inspect-presale (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sgg:
+        description: '시군구 코드 (예: 11740)'
+        required: true
+      ym:
+        description: '계약년월 YYYYMM (예: 202510)'
+        required: true
+      apt:
+        description: '단지명 필터 (부분일치, 예: 올림픽)'
+        required: true
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 분양권/입주권 전매 원본 조회
+        env:
+          MOLIT_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+          SGG: ${{ inputs.sgg }}
+          YM: ${{ inputs.ym }}
+          APT: ${{ inputs.apt }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+          key=os.environ["MOLIT_KEY"]; sgg=os.environ["SGG"]; ym=os.environ["YM"]; apt=os.environ["APT"]
+          q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"1000"})
+          url="https://apis.data.go.kr/1613000/RTMSDataSvcSilvTrade/getRTMSDataSvcSilvTrade?"+q
+          try:
+              body=urllib.request.urlopen(url,timeout=30).read()
+          except Exception as e:
+              print("HTTP 실패:", e); raise SystemExit(0)
+          txt=body.decode("utf-8","replace")
+          try:
+              root=ET.fromstring(body)
+          except Exception:
+              print("XML 파싱 실패. 원문 앞부분:\n", txt[:1200]); raise SystemExit(0)
+          rc=root.findtext(".//resultCode"); msg=root.findtext(".//resultMsg")
+          print("resultCode:",rc," resultMsg:",msg,"  (00/0=정상, 30/31=키 미등록·권한없음, 22=quota)")
+          items=list(root.iter("item"))
+          print("총 item 수:", len(items))
+          if items:
+              print("\n[첫 item 전체 필드 스키마]")
+              for c in items[0]:
+                  print(f"   <{c.tag}> = {(c.text or '').strip()}")
+          # apt 부분일치 목록
+          hits=[it for it in items if apt in (it.findtext('aptNm') or '')]
+          print(f"\n[{apt} 부분일치 {len(hits)}건]  (필드명은 위 스키마 참고)")
+          def g(it,*names):
+              for n in names:
+                  v=it.findtext(n)
+                  if v is not None: return v.strip()
+              return ""
+          out=[]
+          for it in hits:
+              amt=int((g(it,'dealAmount') or '0').replace(',','') or 0)
+              out.append((amt, g(it,'aptNm'), g(it,'excluUseAr'),
+                          f"{g(it,'dealYear')}-{g(it,'dealMonth').zfill(2)}-{g(it,'dealDay').zfill(2)}",
+                          g(it,'floor'), g(it,'umdNm')))
+          for amt,nm,area,d,fl,umd in sorted(out,key=lambda x:-x[0]):
+              print(f"   {amt:>9,}만 | {nm} | {area}㎡ | {d} | {fl}층 | {umd}")
+          PY
