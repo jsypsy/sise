@@ -31,11 +31,21 @@ jobs:
           import os, urllib.parse, urllib.request, xml.etree.ElementTree as ET
           key=os.environ["MOLIT_KEY"]; sgg=os.environ["SGG"]; ym=os.environ["YM"]; apt=os.environ["APT"]
           q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"1000"})
-          url="https://apis.data.go.kr/1613000/RTMSDataSvcSilvTrade/getRTMSDataSvcSilvTrade?"+q
+          ep="https://apis.data.go.kr/1613000/RTMSDataSvcSilvTrade/getRTMSDataSvcSilvTrade"
+          body=None
           try:
-              body=urllib.request.urlopen(url,timeout=30).read()
+              body=urllib.request.urlopen(ep+"?"+q,timeout=30).read()
+          except urllib.error.HTTPError as e:
+              errtxt=""
+              try: errtxt=e.read().decode("utf-8","replace")[:800]
+              except Exception: pass
+              # data.go.kr 게이트웨이는 403 본문에 사유를 담는다:
+              #   SERVICE_KEY_IS_NOT_REGISTERED_ERROR → 이 API에 활용신청 필요(키 권한)
+              #   NO_OPENAPI_SERVICE_ERROR → 엔드포인트/서비스명 오류
+              print(f"[HTTP {e.code}] {ep}\n본문:\n{errtxt}")
+              raise SystemExit(0)
           except Exception as e:
-              print("HTTP 실패:", e); raise SystemExit(0)
+              print("기타 실패:", e); raise SystemExit(0)
           txt=body.decode("utf-8","replace")
           try:
               root=ET.fromstring(body)
