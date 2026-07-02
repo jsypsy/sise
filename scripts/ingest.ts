@@ -1,12 +1,16 @@
 import { XMLParser } from "fast-xml-parser";
 import { createServiceClient } from "../lib/supabase";
 import { REGIONS } from "../lib/regions";
-import { refineItem, type MolitItem } from "../lib/refine";
+import { refineItem, refineSilvItem, type MolitItem, type MolitSilvItem } from "../lib/refine";
 
 // 로컬 개발 시 .env.local 로드 (GitHub Actions에선 이미 환경변수 주입됨)
 try { process.loadEnvFile(".env.local"); } catch { /* noop */ }
 
 const parser = new XMLParser();
+
+// 국토부 실거래가 오퍼레이션 엔드포인트.
+const EP_MAEMAE = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
+const EP_SILV   = "https://apis.data.go.kr/1613000/RTMSDataSvcSilvTrade/getRTMSDataSvcSilvTrade"; // 분양권/입주권
 
 // ─── 헬퍼 ────────────────────────────────────────────────────
 function parseArgs(): Record<string, string> {
@@ -39,8 +43,8 @@ function recentYmsKst(months: number): string[] {
 }
 
 // ─── 수집 ─────────────────────────────────────────────────────
-async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo: number, attempt = 0): Promise<ReturnType<typeof parser.parse>> {
-  const url = new URL("https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev");
+async function fetchPage(serviceKey: string, endpoint: string, sgg_cd: string, ym: string, pageNo: number, attempt = 0): Promise<ReturnType<typeof parser.parse>> {
+  const url = new URL(endpoint);
   url.searchParams.set("serviceKey", serviceKey);
   url.searchParams.set("LAWD_CD", sgg_cd);
   url.searchParams.set("DEAL_YMD", ym);
@@ -52,13 +56,13 @@ async function fetchPage(serviceKey: string, sgg_cd: string, ym: string, pageNo:
     const wait = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s
     console.warn(`  [${sgg_cd}/${ym}] 429 — ${wait / 1000}s 후 재시도 (${attempt + 1}/4)`);
     await new Promise(r => setTimeout(r, wait));
-    return fetchPage(serviceKey, sgg_cd, ym, pageNo, attempt + 1);
+    return fetchPage(serviceKey, endpoint, sgg_cd, ym, pageNo, attempt + 1);
   }
   if (res.status === 502 && attempt < 2) {
     const wait = 1000 * (attempt + 1); // 1s, 2s
     console.warn(`  [${sgg_cd}/${ym}] 502 — ${wait / 1000}s 후 재시도 (${attempt + 1}/2)`);
     await new Promise(r => setTimeout(r, wait));
-    return fetchPage(serviceKey, sgg_cd, ym, pageNo, attempt + 1);
+    return fetchPage(serviceKey, endpoint, sgg_cd, ym, pageNo, attempt + 1);
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -89,7 +93,7 @@ async function ingestSggYm(
   let upserted = 0;
 
   do {
-    const parsed = await fetchPage(serviceKey, sgg_cd, ym, pageNo);
+    const parsed = await fetchPage(serviceKey, EP_MAEMAE, sgg_cd, ym, pageNo);
     const body = parsed?.response?.body;
     if (!body) { console.error(`  [${sgg_cd}/${ym}] 응답 body 없음`); break; }
 
@@ -133,6 +137,60 @@ async function ingestSggYm(
     console.log(`  [${sgg_cd}/${ym}] total=${totalCount} upserted=${upserted}`);
 }
 
+// 분양권/입주권 전매 수집 — 매매(ingestSggYm)와 동일 구조, refineSilvItem + EP_SILV 사용.
+// 신축 입주장 단지의 소유권이전 전 거래(입주권/분양권)를 매매와 같은 transactions에 적재해
+// 전고점·시그널을 통합한다. dealingGbn/cdealType이 매매와 동일해 직거래/취소 규칙 그대로 적용.
+async function ingestSilvSggYm(
+  serviceKey: string,
+  sgg_cd: string,
+  ym: string,
+  firstSeen: string,
+  db: ReturnType<typeof createServiceClient>
+) {
+  let pageNo = 1, totalCount = 0, fetched = 0, upserted = 0;
+
+  do {
+    const parsed = await fetchPage(serviceKey, EP_SILV, sgg_cd, ym, pageNo);
+    const body = parsed?.response?.body;
+    if (!body) { console.error(`  [분양권 ${sgg_cd}/${ym}] 응답 body 없음`); break; }
+
+    if (pageNo === 1) totalCount = parseInt(String(body.totalCount ?? "0"), 10);
+    if (totalCount === 0) break;
+
+    const rawItems = body?.items?.item;
+    if (!rawItems) break;
+
+    const items: MolitSilvItem[] = Array.isArray(rawItems) ? rawItems : [rawItems];
+    const rows = items
+      .map(i => refineSilvItem(i, sgg_cd))
+      .filter((r): r is NonNullable<typeof r> => r != null)
+      .map(r => ({ ...r, first_seen: firstSeen }));
+
+    if (rows.length) {
+      const { error } = await db
+        .from("transactions")
+        .upsert(rows, { onConflict: "raw_key", ignoreDuplicates: true });
+      if (error) console.error(`  [분양권 ${sgg_cd}/${ym}] upsert 오류:`, error.message);
+      else upserted += rows.length;
+
+      const canceledRows = rows
+        .filter(r => r.canceled)
+        .map(r => ({ raw_key: r.raw_key, cdeal_day: r.cdeal_day }));
+      if (canceledRows.length) {
+        const { data: flipped, error: cErr } = await db.rpc("apply_cancellations", { rows: canceledRows });
+        if (cErr) console.error(`  [분양권 ${sgg_cd}/${ym}] 취소 갱신 오류:`, cErr.message);
+        else if (flipped) console.log(`  [분양권 ${sgg_cd}/${ym}] 취소 갱신 ${flipped}건`);
+      }
+    }
+
+    fetched += items.length;
+    pageNo++;
+  } while (fetched < totalCount);
+
+  if (totalCount > 0)
+    console.log(`  [분양권 ${sgg_cd}/${ym}] total=${totalCount} upserted=${upserted}`);
+}
+
 // ─── main ─────────────────────────────────────────────────────
 async function main() {
   const molitKey = process.env.MOLIT_SERVICE_KEY;
@@ -162,6 +220,12 @@ async function main() {
     for (const sgg_cd of targets) {
       try {
         await ingestSggYm(molitKey, sgg_cd, ym, firstSeen, db);
+        // 분양권/입주권도 같은 지역·월로 수집(별도 API·별도 quota). 실패해도 매매엔 영향 없게 격리.
+        try {
+          await ingestSilvSggYm(molitKey, sgg_cd, ym, firstSeen, db);
+        } catch (silvErr) {
+          console.error(`  [분양권 ${sgg_cd}/${ym}] 실패:`, silvErr);
+        }
         consecutive429 = 0;
       } catch (err) {
         console.error(`  [${sgg_cd}/${ym}] 실패:`, err);

@@ -7,6 +7,7 @@ import { won } from "@/lib/format";
 import { REGIONS, SIDO_LIST, CODE_TO_NAME } from "@/lib/regions";
 import { complexHref } from "@/lib/complex";
 import type { Signal } from "@/lib/types";
+import TradeBadge from "../trade-badge";
 
 function sinceStr() {
   const d = new Date();
@@ -26,12 +27,15 @@ function SignalList({ items, loading }: { items: Signal[]; loading: boolean }) {
         <li key={s.id} className="flex items-baseline gap-2 py-2 border-b border-[var(--line)]">
           <span className="text-xs text-[var(--ink-soft)] tabular-nums w-4 shrink-0">{i + 1}</span>
           <div className="flex-1 min-w-0">
-            <Link
-              href={complexHref(s.sgg_cd, s.apt_nm)}
-              className="font-medium hover:underline truncate block"
-            >
-              {s.apt_nm}
-            </Link>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Link
+                href={complexHref(s.sgg_cd, s.apt_nm)}
+                className="font-medium hover:underline truncate"
+              >
+                {s.apt_nm}
+              </Link>
+              <TradeBadge tt={s.trade_type} />
+            </div>
             <p className="text-xs text-[var(--ink-soft)]">
               {CODE_TO_NAME[s.sgg_cd] ?? s.sgg_cd} · {s.pyeong}평 · {s.deal_date}
             </p>

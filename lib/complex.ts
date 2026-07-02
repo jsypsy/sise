@@ -13,6 +13,7 @@ export type RawDeal = {
   g: string;          // dealing_gbn 중개거래/직거래
   c: boolean;         // canceled
   a?: number;         // area m² (있을 수 있음)
+  tt?: string;        // trade_type 매매/분양권/입주권 (구 R2 파일엔 없을 수 있음 → 매매)
 };
 
 export type RawComplex = {
@@ -54,7 +55,7 @@ async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
   const sinceStr = since.toISOString().slice(0, 10);
   const { data } = await supabase
     .from("transactions")
-    .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled")
+    .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled, trade_type")
     .eq("sgg_cd", sgg)
     .eq("apt_nm", apt)
     .gte("first_seen", sinceStr)
@@ -67,6 +68,7 @@ async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
     fl: (r.floor ?? null) as number | null,
     g: r.dealing_gbn as string,
     c: r.canceled as boolean,
+    tt: (r.trade_type ?? "매매") as string,
   }));
 }
 
@@ -74,7 +76,7 @@ async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
 // 키는 raw_key와 동일 식별자 — 한 단지 안에선 (날짜·가격·전용면적·층)이면 동일 거래.
 function mergeDeals(r2: RawDeal[], recent: RawDeal[]): RawDeal[] {
   const key = (x: RawDeal) =>
-    `${x.d}|${x.p}|${x.a != null ? Number(x.a).toFixed(2) : ""}|${x.fl ?? ""}`;
+    `${x.d}|${x.p}|${x.a != null ? Number(x.a).toFixed(2) : ""}|${x.fl ?? ""}|${x.tt ?? "매매"}`;
   const seen = new Set(r2.map(key));
   const extra = recent.filter((x) => !seen.has(key(x)));
   return extra.length ? [...r2, ...extra].sort((a, b) => a.d.localeCompare(b.d)) : r2;

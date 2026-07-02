@@ -16,11 +16,15 @@ import { XMLParser } from "fast-xml-parser";
 import { AwsClient } from "aws4fetch";
 import { createServiceClient } from "../lib/supabase";
 import { REGIONS } from "../lib/regions";
-import { refineItem } from "../lib/refine";
+import { refineItem, refineSilvItem } from "../lib/refine";
 
 try { process.loadEnvFile(".env.local"); } catch { /* noop */ }
 
 const parser = new XMLParser();
+
+// 국토부 실거래가 오퍼레이션 엔드포인트.
+const EP_MAEMAE = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
+const EP_SILV   = "https://apis.data.go.kr/1613000/RTMSDataSvcSilvTrade/getRTMSDataSvcSilvTrade"; // 분양권/입주권
 
 type Peak = { apt_nm: string; sgg_cd: string; umd_nm: string; pyeong: number; peak_price: number; peak_date: string };
 
@@ -33,6 +37,7 @@ type RawDeal = {
   fl: number | null; // floor
   g: string;         // dealing_gbn 중개거래/직거래
   c: boolean;        // canceled    취소거래
+  tt: string;        // trade_type  매매/분양권/입주권
 };
 
 /** 단지 1개 = 파일 1개 */
@@ -111,103 +116,103 @@ async function fetchRegion(
   molitKey: string,
   state: RunState,
 ): Promise<void> {
-  for (const ym of months) {
-    if (state.aborted) return; // quota 소진 감지 시 남은 달 즉시 중단
-    try {
-      let pageNo = 1, totalCount = 0, fetched = 0;
-      do {
-        const url = new URL(
-          "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
-        );
-        url.searchParams.set("serviceKey", molitKey);
-        url.searchParams.set("LAWD_CD", sgg_cd);
-        url.searchParams.set("DEAL_YMD", ym);
-        url.searchParams.set("pageNo", String(pageNo));
-        url.searchParams.set("numOfRows", "1000");
-
-        const res = await fetchWithRetry(url.toString(), sgg_cd, ym);
-        if (res.status === 429) {
-          // 재시도 후에도 429 = quota 소진 가능성. 누적해서 임계 넘으면 전체 조기 종료.
-          // (성공하면 아래에서 0으로 리셋 → 흩어진 일시적 429로는 종료되지 않음)
-          if (++state.hard429 >= 6) {
-            state.aborted = true;
-            console.error("연속 429 다수 — 일일 quota 소진 추정. 수집 조기 종료(수집분은 그대로 업서트).");
-          }
-          return;
-        }
-        if (!res.ok) break;
-
-        const parsed = parser.parse(await res.text());
-        // fast-xml-parser가 "000"/"00"/"0"→숫자 0, "03"→3 으로 변환하므로 정수로 정규화한다.
-        // (헤더가 없으면 NaN → 정상으로 간주하고 body로 데이터 유무를 판정)
-        const rc = parseInt(String(parsed?.response?.header?.resultCode ?? "0"), 10);
-        if (rc === 22) {
-          // 일일 quota 소진(확정) — 전체 조기 종료. 누적 데이터는 그대로 업서트된다.
-          console.warn(`  [${sgg_cd}] resultCode=22 — quota 소진. 수집 조기 종료.`);
-          state.aborted = true;
-          return;
-        }
-        if (rc !== 0 && rc !== 3 && !Number.isNaN(rc)) {
-          // 0=정상, 3=NODATA(정상), 그 외 양수=오류 → 이 달만 건너뜀
-          console.warn(`  [${sgg_cd}/${ym}] resultCode=${rc} — 건너뜀`);
-          break;
-        }
-        state.hard429 = 0; // 정상 응답 — 연속 429 카운터 리셋
-
-        const body = parsed?.response?.body;
-        if (!body) break;
-
-        if (pageNo === 1) totalCount = parseInt(String(body.totalCount ?? "0"), 10);
-        if (totalCount === 0) break;
-
-        const rawItems = body?.items?.item;
-        if (!rawItems) break;
-
-        const items = Array.isArray(rawItems) ? rawItems : [rawItems];
-        for (const item of items) {
-          const r = refineItem(item, sgg_cd);
-          if (!r) continue;
-
-          // ── raw 누적 (취소거래 포함 — 전부 보존, c 플래그로 구분) ──────────
-          const aptKey = `${r.apt_nm}|${r.sgg_cd}`;
-          let cx = complexes.get(aptKey);
-          if (!cx) {
-            cx = {
-              apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, apt_seq: r.apt_seq,
-              umd_nm: r.umd_nm, build_year: r.build_year, deals: [],
-            };
-            complexes.set(aptKey, cx);
-          }
-          cx.deals.push({
-            d: r.deal_date, p: r.price, a: r.area, py: r.pyeong,
-            fl: r.floor, g: r.dealing_gbn, c: r.canceled,
-          });
-
-          // ── peaks 갱신 (취소·직거래·라이브 윈도우 제외 — 시그널 전고점은 중개거래 기준) ──
-          // 동명단지(③) 분리: 그룹 키에 umd_nm 포함(NULL은 '' 버킷, hp 저장과 일치).
-          // 라이브 윈도우(최근 3개월)는 hp에서 제외 — self-inclusion 방지(위 PEAK_CUTOFF 주석).
-          if (r.canceled || r.dealing_gbn === "직거래" || r.deal_date >= PEAK_CUTOFF) continue;
-          const umd      = r.umd_nm ?? "";
-          const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${umd}|${r.pyeong}`;
-          const existing = peaks.get(peakKey);
-          if (!existing || r.price > existing.peak_price) {
-            peaks.set(peakKey, {
-              apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, umd_nm: umd, pyeong: r.pyeong,
-              peak_price: r.price, peak_date: r.deal_date,
-            });
-          }
-        }
-
-        fetched += items.length;
-        pageNo++;
-      } while (fetched < totalCount);
-
-      // 모든 달에 delay — 빈 달도 포함해 burst 방지
-      await new Promise(r => setTimeout(r, 200));
-    } catch (err) {
-      console.error(`  [${sgg_cd}/${ym}] 실패:`, err);
+  // 매매/분양권 공통: 정제된 거래 1건을 R2 complexes와 peaks에 반영.
+  const processItem = (r: NonNullable<ReturnType<typeof refineItem>>) => {
+    // ── raw 누적 (취소·직거래·분양권 포함 — 전부 보존, 플래그로 구분) ──
+    const aptKey = `${r.apt_nm}|${r.sgg_cd}`;
+    let cx = complexes.get(aptKey);
+    if (!cx) {
+      cx = {
+        apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, apt_seq: r.apt_seq,
+        umd_nm: r.umd_nm, build_year: r.build_year, deals: [],
+      };
+      complexes.set(aptKey, cx);
     }
-  }
+    cx.deals.push({
+      d: r.deal_date, p: r.price, a: r.area, py: r.pyeong,
+      fl: r.floor, g: r.dealing_gbn, c: r.canceled, tt: r.trade_type,
+    });
+
+    // ── peaks 갱신 (취소·직거래·라이브 윈도우 제외 — 매매+입주권 통합 전고점) ──
+    // 동명단지(③) 분리: 그룹 키에 umd_nm 포함(NULL은 '' 버킷, hp 저장과 일치).
+    // 라이브 윈도우(최근 3개월)는 hp에서 제외 — self-inclusion 방지(위 PEAK_CUTOFF 주석).
+    if (r.canceled || r.dealing_gbn === "직거래" || r.deal_date >= PEAK_CUTOFF) return;
+    const umd      = r.umd_nm ?? "";
+    const peakKey  = `${r.apt_nm}|${r.sgg_cd}|${umd}|${r.pyeong}`;
+    const existing = peaks.get(peakKey);
+    if (!existing || r.price > existing.peak_price) {
+      peaks.set(peakKey, {
+        apt_nm: r.apt_nm, sgg_cd: r.sgg_cd, umd_nm: umd, pyeong: r.pyeong,
+        peak_price: r.price, peak_date: r.deal_date,
+      });
+    }
+  };
+
+  // 한 API(매매 or 분양권)의 전 기간(months)을 크롤. quota 소진 시 state로 조기 종료.
+  const crawl = async (endpoint: string, kind: "매매" | "분양권") => {
+    for (const ym of months) {
+      if (state.aborted) return; // quota 소진 감지 시 남은 달 즉시 중단
+      try {
+        let pageNo = 1, totalCount = 0, fetched = 0;
+        do {
+          const url = new URL(endpoint);
+          url.searchParams.set("serviceKey", molitKey);
+          url.searchParams.set("LAWD_CD", sgg_cd);
+          url.searchParams.set("DEAL_YMD", ym);
+          url.searchParams.set("pageNo", String(pageNo));
+          url.searchParams.set("numOfRows", "1000");
+
+          const res = await fetchWithRetry(url.toString(), sgg_cd, ym);
+          if (res.status === 429) {
+            if (++state.hard429 >= 6) {
+              state.aborted = true;
+              console.error("연속 429 다수 — 일일 quota 소진 추정. 수집 조기 종료(수집분은 그대로 업서트).");
+            }
+            return;
+          }
+          if (!res.ok) break;
+
+          const parsed = parser.parse(await res.text());
+          const rc = parseInt(String(parsed?.response?.header?.resultCode ?? "0"), 10);
+          if (rc === 22) {
+            console.warn(`  [${kind} ${sgg_cd}] resultCode=22 — quota 소진. 수집 조기 종료.`);
+            state.aborted = true;
+            return;
+          }
+          if (rc !== 0 && rc !== 3 && !Number.isNaN(rc)) {
+            console.warn(`  [${kind} ${sgg_cd}/${ym}] resultCode=${rc} — 건너뜀`);
+            break;
+          }
+          state.hard429 = 0; // 정상 응답 — 연속 429 카운터 리셋
+
+          const body = parsed?.response?.body;
+          if (!body) break;
+
+          if (pageNo === 1) totalCount = parseInt(String(body.totalCount ?? "0"), 10);
+          if (totalCount === 0) break;
+
+          const rawItems = body?.items?.item;
+          if (!rawItems) break;
+
+          const items = Array.isArray(rawItems) ? rawItems : [rawItems];
+          for (const item of items) {
+            const r = kind === "매매" ? refineItem(item, sgg_cd) : refineSilvItem(item, sgg_cd);
+            if (r) processItem(r);
+          }
+
+          fetched += items.length;
+          pageNo++;
+        } while (fetched < totalCount);
+
+        await new Promise(res => setTimeout(res, 200)); // burst 방지
+      } catch (err) {
+        console.error(`  [${kind} ${sgg_cd}/${ym}] 실패:`, err);
+      }
+    }
+  };
+
+  await crawl(EP_MAEMAE, "매매");
+  await crawl(EP_SILV, "분양권"); // 별도 API·별도 quota — 입주권/분양권 전고점 통합
 }
 
 async function main() {

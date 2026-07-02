@@ -16,6 +16,7 @@ export type Tx = {
   canceled: boolean;
   cdeal_day: string | null;
   road_nm: string | null;
+  trade_type: string;       // '매매' | '분양권' | '입주권'
 };
 
 export type Signal = Tx & {

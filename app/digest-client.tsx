@@ -46,7 +46,7 @@ function HighRow({ r, first }: { r: DigestRow; first: boolean }) {
           className="text-sm font-bold text-[var(--ink)] leading-tight truncate hover:underline"
         >{r.name}</Link>
         <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
-          {r.loc} · {r.pyeong}평
+          {r.loc} · {r.pyeong}평{r.tt && r.tt !== "매매" ? ` · ${r.tt}` : ""}
         </span>
       </div>
       <div className="flex flex-col items-end shrink-0">
@@ -71,7 +71,7 @@ function RebRow({ r, first }: { r: DigestRow; first: boolean }) {
           className="text-sm font-bold text-[var(--ink)] leading-tight truncate hover:underline"
         >{r.name}</Link>
         <span className="text-[11px] text-[var(--ink-soft)] mt-0.5">
-          {r.loc} · {r.pyeong}평
+          {r.loc} · {r.pyeong}평{r.tt && r.tt !== "매매" ? ` · ${r.tt}` : ""}
         </span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
