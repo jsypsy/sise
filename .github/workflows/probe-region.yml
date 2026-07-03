@@ -1,0 +1,44 @@
+# 여러 LAWD_CD(시군구 코드)를 특정 계약월로 MOLIT 매매 API에 찔러 resultCode+totalCount를
+# 코드별로 출력한다. 행정구역 개편으로 죽은 옛 코드 / 살아있는 신규 코드를 경험적으로 판별.
+# 사용법: Actions → "probe-region" → sggs(콤마구분), ym(YYYYMM) → Run.
+name: probe-region (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sggs:
+        description: '시군구 코드 콤마구분 (예: 29110,29140,28110)'
+        required: true
+      ym:
+        description: '계약년월 YYYYMM'
+        required: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드별 조회
+        env:
+          MOLIT_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+          SGGS: ${{ inputs.sggs }}
+          YM: ${{ inputs.ym }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request, xml.etree.ElementTree as ET, time
+          key=os.environ["MOLIT_KEY"]; ym=os.environ["YM"]
+          sggs=[s.strip() for s in os.environ["SGGS"].split(",") if s.strip()]
+          ep="https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
+          print(f"ym={ym}  코드 {len(sggs)}개\n코드 | resultCode | totalCount | 첫 단지")
+          for sgg in sggs:
+              q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"1"})
+              try:
+                  root=ET.fromstring(urllib.request.urlopen(ep+"?"+q,timeout=30).read())
+              except Exception as e:
+                  print(f"  {sgg} | 실패 {e}"); continue
+              rc=root.findtext(".//resultCode") or "?"
+              tc=root.findtext(".//totalCount") or "?"
+              nm=root.findtext(".//item/aptNm") or ""
+              flag=" ← 데이터有" if (tc.isdigit() and int(tc)>0) else (" (0)" if tc=="0" else "")
+              print(f"  {sgg} | rc={rc} | total={tc}{flag} | {nm}")
+              time.sleep(0.3)
+          PY
