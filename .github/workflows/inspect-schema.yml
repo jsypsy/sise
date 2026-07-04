@@ -1,0 +1,48 @@
+# MOLIT 매매 API(RTMSDataSvcAptTradeDev) 첫 item의 전체 필드를 덤프한다.
+# 거래동(건물동) 등 우리가 안 받는 필드가 응답에 있는지 확인용(읽기 전용).
+name: inspect-schema (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sgg:
+        description: '시군구 코드 (예: 11740)'
+        required: true
+        default: '11740'
+      ym:
+        description: '계약년월 YYYYMM (예: 202605)'
+        required: true
+        default: '202605'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 매매 API 전체 필드 덤프
+        env:
+          MOLIT_KEY: ${{ secrets.MOLIT_SERVICE_KEY }}
+          SGG: ${{ inputs.sgg }}
+          YM: ${{ inputs.ym }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+          key=os.environ["MOLIT_KEY"]; sgg=os.environ["SGG"]; ym=os.environ["YM"]
+          ep="https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
+          q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"3"})
+          root=ET.fromstring(urllib.request.urlopen(ep+"?"+q,timeout=30).read())
+          print("resultCode:", root.findtext(".//resultCode"))
+          items=list(root.iter("item"))
+          print("item 수:", len(items))
+          # 모든 item의 태그 합집합(어떤 item에만 있는 필드도 포착)
+          tags=set()
+          for it in items:
+              for c in it: tags.add(c.tag)
+          print("\n[전체 필드 목록]")
+          for t in sorted(tags): print("   -", t)
+          # 동/건물 관련 필드 하이라이트
+          hits=[t for t in tags if any(k in t.lower() for k in ["dong","bun","road","호","동"]) or "dong" in t.lower()]
+          print("\n[동/번지/도로 관련 후보]", hits or "(없음)")
+          print("\n[첫 item 값]")
+          for c in items[0]:
+              print(f"   <{c.tag}> = {(c.text or '').strip()}")
+          PY
