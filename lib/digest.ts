@@ -24,7 +24,6 @@ export type DigestRow = {
   price: string; // 만원 → "29억 5,000"
   deltaEok: number | null; // 신고가: 직전 전고점 대비 상승폭(억). 없으면 null
   recovery: number | null; // 반등: 회복률(%). 없으면 null
-  tt: string;              // trade_type 매매/분양권/입주권
 };
 
 export type Digest = {
@@ -77,7 +76,6 @@ export async function buildDigest(): Promise<Digest> {
     price: won(s.price),
     deltaEok: s.prev_peak != null ? Math.round((s.price - s.prev_peak) / 100) / 100 : null,
     recovery: null,
-    tt: s.trade_type,
   }));
 
   const rebs: DigestRow[] = rebSignals.map((s) => ({
@@ -88,20 +86,16 @@ export async function buildDigest(): Promise<Digest> {
     price: won(s.price),
     deltaEok: null,
     recovery: s.recovery_rate ?? null,
-    tt: s.trade_type,
   }));
 
   // 텍스트(카페 복붙·API)는 기존 포맷 그대로 유지.
   let text = `[아파트 실거래 시그널] ${date}\n`;
   text += `총 ${signals.length}건 / 신고가 ${highSignals.length}건 / 반등 ${rebSignals.length}건\n`;
 
-  // 분양권/입주권은 유형을 표기해 매매와 구분한다.
-  const ttMark = (s: Signal) => (s.trade_type && s.trade_type !== "매매" ? ` [${s.trade_type}]` : "");
-
   if (highSignals.length > 0) {
     text += "\n■ 신고가 TOP\n";
     for (const s of highSignals) {
-      text += `  ${s.apt_nm} (${loc(s)}) ${s.pyeong}평 ${won(s.price)}${ttMark(s)}`;
+      text += `  ${s.apt_nm} (${loc(s)}) ${s.pyeong}평 ${won(s.price)}`;
       if (s.prev_peak) text += ` (직전 ${wonShort(s.prev_peak)})`;
       text += "\n";
     }
@@ -110,13 +104,13 @@ export async function buildDigest(): Promise<Digest> {
   if (rebSignals.length > 0) {
     text += "\n■ 반등 (전고점 회복 진행)\n";
     for (const s of rebSignals) {
-      text += `  ${s.apt_nm} (${loc(s)}) ${s.pyeong}평 ${won(s.price)}${ttMark(s)}`;
+      text += `  ${s.apt_nm} (${loc(s)}) ${s.pyeong}평 ${won(s.price)}`;
       if (s.recovery_rate != null) text += ` · 회복률 ${s.recovery_rate}%`;
       text += "\n";
     }
   }
 
-  text += "\nⓘ 국토부 실거래가 기반 · 직거래/취소거래 제외 · 분양권/입주권 포함(표시)";
+  text += "\nⓘ 국토부 실거래가 기반 · 직거래/취소거래 제외";
 
   return { date, total: signals.length, highs, rebs, text };
 }

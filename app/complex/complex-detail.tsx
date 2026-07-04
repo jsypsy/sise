@@ -153,20 +153,11 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
                 <td className="py-1.5 pr-3 text-xs whitespace-nowrap">
                   {deal.c ? (
                     <span className="text-[var(--ink-soft)]">취소</span>
-                  ) : (
-                    <span className="inline-flex gap-1 align-middle">
-                      {deal.tt && deal.tt !== "매매" && (
-                        <span className="inline-block text-[10px] font-bold text-[var(--ink-soft)] border border-[var(--line-strong)] rounded px-1 py-0 leading-tight">
-                          {deal.tt}
-                        </span>
-                      )}
-                      {deal.g === "직거래" && (
-                        <span className="inline-block text-[10px] font-bold text-[var(--blue)] border border-[var(--blue)] rounded px-1 py-0 leading-tight">
-                          직거래
-                        </span>
-                      )}
+                  ) : deal.g === "직거래" ? (
+                    <span className="inline-block text-[10px] font-bold text-[var(--blue)] border border-[var(--blue)] rounded px-1 py-0 leading-tight align-middle">
+                      직거래
                     </span>
-                  )}
+                  ) : null}
                 </td>
                 <td className="py-1.5 text-right text-xs">
                   {deal.delta_pct != null ? (
