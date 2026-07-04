@@ -28,11 +28,16 @@ jobs:
           import os, urllib.parse, urllib.request, xml.etree.ElementTree as ET
           key=os.environ["MOLIT_KEY"]; sgg=os.environ["SGG"]; ym=os.environ["YM"]
           ep="https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
-          q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"3"})
+          q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"1000"})
           root=ET.fromstring(urllib.request.urlopen(ep+"?"+q,timeout=30).read())
           print("resultCode:", root.findtext(".//resultCode"))
           items=list(root.iter("item"))
           print("item 수:", len(items))
+          # 채움율: aptDong(거래동), rgstDate(등기일자)
+          def nonempty(tag): return sum(1 for it in items if (it.findtext(tag) or "").strip())
+          n=len(items) or 1
+          for tag in ["aptDong","rgstDate"]:
+              c=nonempty(tag); print(f"  [채움율] {tag}: {c}/{len(items)} ({100*c//n}%)")
           # 모든 item의 태그 합집합(어떤 item에만 있는 필드도 포착)
           tags=set()
           for it in items:
