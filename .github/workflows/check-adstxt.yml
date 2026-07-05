@@ -1,0 +1,17 @@
+# 라이브 sise.today의 /ads.txt 응답과 홈 google-adsense-account 메타를 확인(읽기 전용).
+name: check-adstxt (read-only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ads.txt + meta 확인
+        run: |
+          echo "=== GET https://sise.today/ads.txt ==="
+          curl -sS -i "https://sise.today/ads.txt" | head -20
+          echo ""
+          echo "=== 홈에서 google-adsense-account 메타 ==="
+          curl -sS "https://sise.today/" | grep -o '<meta name="google-adsense-account"[^>]*>' || echo "(메타 없음)"
