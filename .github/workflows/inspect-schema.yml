@@ -45,6 +45,12 @@ jobs:
           bydong=Counter((it.findtext('aptNm') or '') for it in items if (it.findtext('aptDong') or '').strip())
           bytot=Counter(it.findtext('aptNm') or '' for it in items)
           print("  [단지별] 동이 채워진 단지 수:", len(bydong), "/ 전체 단지:", len(bytot))
+          # 교차: 동 ↔ 등기 상관관계
+          d=lambda it:(it.findtext('aptDong') or '').strip(); r=lambda it:(it.findtext('rgstDate') or '').strip()
+          both=sum(1 for it in items if d(it) and r(it))
+          dong_only=sum(1 for it in items if d(it) and not r(it))
+          rgst_only=sum(1 for it in items if r(it) and not d(it))
+          print(f"  [교차] 동+등기 둘다:{both}  동만:{dong_only}  등기만:{rgst_only}  (동 있는데 등기 없는 게 0이면 = 동은 등기완료분만)")
           # 모든 item의 태그 합집합(어떤 item에만 있는 필드도 포착)
           tags=set()
           for it in items:
