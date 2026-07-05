@@ -18,6 +18,7 @@ export interface MolitItem {
   cdealType?: string;
   cdealDay?: string | number;
   roadNm?: string | number;
+  aptDong?: string | number;   // 거래동. 등기완료분에만 채워짐(대부분 비어옴)
 }
 
 function pad2(n: string | number) {
@@ -48,10 +49,11 @@ export function refineItem(item: MolitItem, sgg_cd: string) {
   const dealing_gbn = String(item.dealingGbn ?? "중개거래").trim();
   const canceled = String(item.cdealType ?? "").trim() === "O";
   const cdeal_day = item.cdealDay ? String(item.cdealDay).trim() || null : null;
+  const apt_dong = item.aptDong ? String(item.aptDong).trim() || null : null;
 
   const raw_key = `${apt_nm}|${umd_nm ?? ""}|${jibun ?? ""}|${area.toFixed(2)}|${floor ?? ""}|${deal_date}|${price}`;
 
-  return { apt_nm, apt_seq, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year, dealing_gbn, canceled, cdeal_day, road_nm, trade_type: "매매", raw_key };
+  return { apt_nm, apt_seq, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year, dealing_gbn, canceled, cdeal_day, road_nm, apt_dong, trade_type: "매매", raw_key };
 }
 
 // 국토부 아파트 분양권전매 실거래가(RTMSDataSvcSilvTrade) 항목.
@@ -98,5 +100,5 @@ export function refineSilvItem(item: MolitSilvItem, sgg_cd: string) {
   // raw_key에 trade_type 접두 → 매매 키(접두 없음)와 절대 충돌하지 않는다.
   const raw_key = `${trade_type}|${apt_nm}|${umd_nm ?? ""}|${jibun ?? ""}|${area.toFixed(2)}|${floor ?? ""}|${deal_date}|${price}`;
 
-  return { apt_nm, apt_seq: null, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year: null, dealing_gbn, canceled, cdeal_day, road_nm: null, trade_type, raw_key };
+  return { apt_nm, apt_seq: null, sgg_cd, umd_nm, jibun, area, pyeong, price, deal_date, floor, build_year: null, dealing_gbn, canceled, cdeal_day, road_nm: null, apt_dong: null, trade_type, raw_key };
 }

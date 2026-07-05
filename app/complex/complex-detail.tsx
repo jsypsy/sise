@@ -124,9 +124,8 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
           <thead>
             <tr className="border-b-2 border-[var(--line-strong)] text-left text-xs text-[var(--ink-soft)]">
               <th className="py-2 pr-3 font-medium">거래일</th>
-              <th className="py-2 pr-3 font-medium">평형/층</th>
+              <th className="py-2 pr-3 font-medium">평형·동·층</th>
               <th className="py-2 pr-3 font-medium text-right">거래가</th>
-              <th className="py-2 pr-3 font-medium">유형</th>
               <th className="py-2 font-medium text-right">증감</th>
             </tr>
           </thead>
@@ -138,7 +137,7 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
               >
                 <td className="py-1.5 pr-3 text-xs">{deal.d}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap">
-                  {deal.py}평{deal.fl != null ? ` ${deal.fl}층` : ""}
+                  {deal.py}평{deal.dg ? ` ${deal.dg}동` : ""}{deal.fl != null ? ` ${deal.fl}층` : ""}
                 </td>
                 <td className="py-1.5 pr-3 text-right font-medium whitespace-nowrap">
                   {deal.is_high && (
@@ -146,18 +145,14 @@ export default function ComplexDetail({ rawDeals }: { rawDeals: RawDeal[] }) {
                       최고가
                     </span>
                   )}
+                  {!deal.c && deal.g === "직거래" && (
+                    <span className="inline-block text-[10px] font-bold text-[var(--blue)] border border-[var(--blue)] rounded px-1 py-0 mr-1 leading-tight align-middle">
+                      직거래
+                    </span>
+                  )}
                   <span className={deal.g === "직거래" ? "text-[var(--blue)]" : deal.is_high ? "text-[var(--red)]" : ""}>
                     {won(deal.p)}
                   </span>
-                </td>
-                <td className="py-1.5 pr-3 text-xs whitespace-nowrap">
-                  {deal.c ? (
-                    <span className="text-[var(--ink-soft)]">취소</span>
-                  ) : deal.g === "직거래" ? (
-                    <span className="inline-block text-[10px] font-bold text-[var(--blue)] border border-[var(--blue)] rounded px-1 py-0 leading-tight align-middle">
-                      직거래
-                    </span>
-                  ) : null}
                 </td>
                 <td className="py-1.5 text-right text-xs">
                   {deal.delta_pct != null ? (

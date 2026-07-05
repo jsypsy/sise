@@ -38,6 +38,7 @@ type RawDeal = {
   g: string;         // dealing_gbn 중개거래/직거래
   c: boolean;        // canceled    취소거래
   tt: string;        // trade_type  매매/분양권/입주권
+  dg: string | null; // apt_dong    거래동(등기완료분에만, 대부분 null)
 };
 
 /** 단지 1개 = 파일 1개 */
@@ -130,7 +131,7 @@ async function fetchRegion(
     }
     cx.deals.push({
       d: r.deal_date, p: r.price, a: r.area, py: r.pyeong,
-      fl: r.floor, g: r.dealing_gbn, c: r.canceled, tt: r.trade_type,
+      fl: r.floor, g: r.dealing_gbn, c: r.canceled, tt: r.trade_type, dg: r.apt_dong,
     });
 
     // ── peaks 갱신 (취소·직거래·라이브 윈도우 제외 — 매매+입주권 통합 전고점) ──

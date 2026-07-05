@@ -14,6 +14,7 @@ export type RawDeal = {
   c: boolean;         // canceled
   a?: number;         // area m² (있을 수 있음)
   tt?: string;        // trade_type 매매/분양권/입주권 (구 R2 파일엔 없을 수 있음 → 매매)
+  dg?: string | null; // apt_dong 거래동 (등기완료분에만, 대부분 없음)
 };
 
 export type RawComplex = {
@@ -55,7 +56,7 @@ async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
   const sinceStr = since.toISOString().slice(0, 10);
   const { data } = await supabase
     .from("transactions")
-    .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled, trade_type")
+    .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled, trade_type, apt_dong")
     .eq("sgg_cd", sgg)
     .eq("apt_nm", apt)
     .gte("first_seen", sinceStr)
@@ -69,6 +70,7 @@ async function fetchRecentDeals(sgg: string, apt: string): Promise<RawDeal[]> {
     g: r.dealing_gbn as string,
     c: r.canceled as boolean,
     tt: (r.trade_type ?? "매매") as string,
+    dg: (r.apt_dong ?? null) as string | null,
   }));
 }
 
