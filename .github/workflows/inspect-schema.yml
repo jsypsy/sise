@@ -38,6 +38,13 @@ jobs:
           n=len(items) or 1
           for tag in ["aptDong","rgstDate"]:
               c=nonempty(tag); print(f"  [채움율] {tag}: {c}/{len(items)} ({100*c//n}%)")
+          # 실제 aptDong 비어있지 않은 샘플 + 단지별 채움 편차(단지에 따라 다를 수 있음)
+          samp=[(it.findtext('aptNm') or '', (it.findtext('aptDong') or '').strip()) for it in items if (it.findtext('aptDong') or '').strip()]
+          print("  [aptDong 채워진 샘플 8]", samp[:8])
+          from collections import Counter
+          bydong=Counter((it.findtext('aptNm') or '') for it in items if (it.findtext('aptDong') or '').strip())
+          bytot=Counter(it.findtext('aptNm') or '' for it in items)
+          print("  [단지별] 동이 채워진 단지 수:", len(bydong), "/ 전체 단지:", len(bytot))
           # 모든 item의 태그 합집합(어떤 item에만 있는 필드도 포착)
           tags=set()
           for it in items:
