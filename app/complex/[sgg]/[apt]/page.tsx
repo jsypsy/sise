@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchComplexMerged, summarize, locationLabel, fetchAptsInSgg, complexHref } from "@/lib/complex";
+import { complexNarrative } from "@/lib/summary";
 import { won } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
 import ComplexDetail from "../../complex-detail";
@@ -54,6 +55,7 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
 
   const loc = locationLabel(sgg, cx.umd_nm);
   const s = summarize(cx.deals);
+  const narrative = complexNarrative(cx, loc);
 
   // 같은 동(없으면 같은 시군구) 다른 단지 — 내부 링크 + 탐색.
   const related = (cx.umd_nm ? inSgg.filter((a) => a.umd_nm === cx.umd_nm) : inSgg)
@@ -103,6 +105,16 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
       <div className="mt-3">
         <WatchButton sgg={sgg} apt={cx.apt_nm} />
       </div>
+
+      {narrative && (
+        <section className="mt-4 text-sm leading-relaxed">
+          {narrative.paragraphs.map((p, i) => (
+            <p key={i} className={i > 0 ? "mt-2 text-[var(--ink-soft)]" : ""}>
+              {p}
+            </p>
+          ))}
+        </section>
+      )}
 
       <ComplexDetail rawDeals={cx.deals} />
 
