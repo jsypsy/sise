@@ -61,6 +61,26 @@ export default function AboutPage() {
         <span className="text-[var(--blue)] font-medium">하락·직거래는 파랑</span>으로 표시합니다.
       </p>
 
+      <h2 className="text-base font-semibold mt-6 mb-1">데이터 처리 원칙</h2>
+      <p className="mb-2">
+        신뢰할 수 있는 시그널을 위해 다음 원칙으로 데이터를 다룹니다.
+      </p>
+      <ul className="list-disc pl-5 space-y-1 mb-4">
+        <li><b>매일 수집</b> — 국토부 공개 데이터를 매일 새벽 수집하며, 신고 지연(계약 후 30일 이내 신고)에 대비해 최근 몇 개월치를 다시 확인합니다.</li>
+        <li><b>취소거래 보존·제외</b> — 취소된 거래는 지우지 않고 취소 표시로 남기되, 신고가·반등 판정에서는 제외합니다. 자전거래 등 왜곡 흔적을 추적하기 위함입니다.</li>
+        <li><b>직거래 기본 제외</b> — 특수관계인 간 거래 등이 섞일 수 있는 직거래는 시그널·집계에서 기본 제외하고 이력에는 구분 표시합니다.</li>
+        <li><b>이전 거래만으로 판정</b> — 전고점·직전가는 해당 거래 이전의 같은 단지·평형 거래만으로 계산합니다. 자기 자신을 포함하면 판정이 왜곡되기 때문입니다.</li>
+        <li><b>입주권·분양권 반영</b> — 등기 전 신축 단지의 거래 공백을 메우기 위해 권리 거래도 수집해 단지 이력에 반영합니다.</li>
+      </ul>
+
+      <h2 className="text-base font-semibold mt-6 mb-1">운영과 문의</h2>
+      <p className="mb-4">
+        시세는 개인이 운영하는 독립 서비스로, 특정 중개업소·건설사·금융사와 이해관계가 없습니다.
+        데이터 오류 제보나 기능 제안은{" "}
+        <Link href="/feedback" className="underline hover:no-underline">의견 보내기</Link>로 알려주시면
+        확인 후 반영합니다.
+      </p>
+
       <h2 className="text-base font-semibold mt-6 mb-1">데이터 출처와 면책</h2>
       <p className="mb-4">
         모든 정보는 국토교통부 실거래가 공개시스템 데이터를 가공한 것으로, 정부 공식 서비스가 아니며
