@@ -5,6 +5,19 @@ import { Gowun_Batang } from "next/font/google";
 import "./globals.css";
 import Nav from "./nav";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, ADSENSE_CLIENT, GA_ID } from "@/lib/site";
+import { jsonLdString } from "@/lib/jsonld";
+
+// 사이트 정체성 JSON-LD — 크롤러에게 서비스 이름·주제·언어를 명시(전 페이지 공통).
+const siteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  alternateName: "sise.today",
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  inLanguage: "ko-KR",
+  publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+};
 
 const gowun = Gowun_Batang({
   weight: ["400", "700"],
@@ -74,6 +87,7 @@ export default function RootLayout({
         <main className="flex-1 px-4 py-4 max-w-4xl mx-auto w-full">
           {children}
         </main>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(siteJsonLd) }} />
         <footer className="border-t border-[var(--line)] py-3 text-xs text-[var(--ink-soft)]">
           <div className="max-w-4xl mx-auto px-4 w-full">
             <div className="flex flex-wrap gap-x-3 gap-y-1">

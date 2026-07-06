@@ -40,6 +40,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     description: desc,
     alternates: { canonical },
     openGraph: { title: `${cx.apt_nm} 실거래가 · ${loc}`, description: desc, url: canonical },
+    // 거래 이력이 너무 적은 단지(R2 미수집 DB폴백 등)는 '얇은 페이지 대량 색인'으로
+    // 저품질 판정을 유발하므로 색인 제외. 사용자는 그대로 볼 수 있고(follow로 링크도 전달),
+    // R2가 채워져 이력이 쌓이면 재검증 때 자동으로 색인 허용된다.
+    ...(s.count < 5 ? { robots: { index: false, follow: true } } : {}),
   };
 }
 
