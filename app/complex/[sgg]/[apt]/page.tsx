@@ -106,6 +106,27 @@ export default async function ComplexDetailPage({ params }: { params: Params }) 
 
       <ComplexDetail rawDeals={cx.deals} />
 
+      <section className="mt-8 border-t border-[var(--line)] pt-4 text-sm leading-relaxed text-[var(--ink-soft)]">
+        <h2 className="text-sm font-semibold text-[var(--ink)] mb-2">이 표를 읽는 법</h2>
+        <p className="mb-2">
+          위 표는 <b>{cx.apt_nm}</b>의 국토교통부 매매 실거래 전체 이력입니다. 기본값은 거래가 가장 많은
+          평형이며, 위쪽 버튼으로 평형을 바꿔 볼 수 있습니다. <b className="text-[var(--red)]">최고가</b> 표시는
+          해당 평형에서 그때까지의 역대 최고 거래가를, <b>증감</b>은 같은 평형 직전 거래 대비 등락률을
+          뜻합니다.
+        </p>
+        <p className="mb-2">
+          <span className="text-[var(--blue)]">직거래</span>(공인중개사를 거치지 않은 거래)와 취소된 거래는
+          시세를 왜곡할 수 있어 파란색·취소선으로 구분해 표시합니다. 평형은 전용면적을 평으로 환산한
+          추정치이며, 정확한 면적은 전용면적(㎡)을 기준으로 확인하세요.
+        </p>
+        <p>
+          실거래는 계약 후 신고까지 시차가 있어 최근 거래는 뒤늦게 추가될 수 있습니다.{" "}
+          <Link href="/guide/real-transaction-price" className="text-[var(--ink)] hover:underline">
+            실거래가란 무엇인가 →
+          </Link>
+        </p>
+      </section>
+
       {related.length > 0 && (
         <section className="mt-8 border-t border-[var(--line)] pt-4">
           <h2 className="text-sm font-semibold mb-2">{relatedLabel}</h2>
