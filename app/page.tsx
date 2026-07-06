@@ -14,6 +14,7 @@ import type { Signal } from "@/lib/types";
 import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
 import { complexHref } from "@/lib/complex";
+import { GUIDES } from "@/lib/guides";
 import MainSearch from "./main-search";
 import WatchlistSignals from "./watchlist-signals";
 
@@ -84,11 +85,21 @@ export default async function HomePage() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-4">
         <Suspense>
           <MainSearch />
         </Suspense>
       </div>
+
+      <p className="text-sm text-[var(--ink-soft)] leading-relaxed mb-6">
+        국토교통부에 신고된 아파트 매매 실거래가를 매일 가공해, 그날 시장에서 의미 있게 움직인 거래만
+        골라 보여줍니다. <b className="text-[var(--red)]">신고가</b>는 그 단지·평형의 역대 최고 거래가,{" "}
+        <b className="text-[var(--gold)]">반등</b>은 전고점 가까이 회복한 거래입니다. 아래는 최근 7일 새로
+        등록된 거래 중 상위 시그널입니다.{" "}
+        <Link href="/guide" className="text-[var(--ink)] hover:underline">
+          시그널 자세히 보기 →
+        </Link>
+      </p>
 
       <WatchlistSignals />
 
@@ -116,6 +127,26 @@ export default async function HomePage() {
           지역별로 보기 →
         </Link>
       </p>
+
+      <section className="mt-10 border-t border-[var(--line)] pt-5">
+        <h2 className="text-base font-semibold mb-1">실거래가 읽는 법</h2>
+        <p className="text-xs text-[var(--ink-soft)] mb-3">
+          신고가·반등 시그널과 실거래가 용어를 쉽게 풀어쓴 가이드입니다.
+        </p>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+          {GUIDES.map((g) => (
+            <li key={g.slug} className="border-b border-[var(--line)] py-2">
+              <Link href={`/guide/${g.slug}`} className="group block">
+                <span className="text-sm font-medium group-hover:underline">{g.title}</span>
+                <span className="block text-xs text-[var(--ink-soft)] mt-0.5">{g.description}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-[var(--ink-soft)] mt-3">
+          <Link href="/blog" className="hover:underline">블로그에서 더 읽기 →</Link>
+        </p>
+      </section>
     </div>
   );
 }
