@@ -84,15 +84,55 @@ function mergeDeals(r2: RawDeal[], recent: RawDeal[]): RawDeal[] {
   return extra.length ? [...r2, ...extra].sort((a, b) => a.d.localeCompare(b.d)) : r2;
 }
 
+// R2 파일이 아직 없는 단지(fetch_peaks 미수집·신규 단지·개편지역 등)용 폴백.
+// 전체이력은 R2에만 있으므로 여기선 DB 핫윈도우(최근 등록분)만 담는다.
+// 부분 이력이라도 보여주는 게 404보다 낫다 — fetch_peaks가 R2를 채우면 전체이력으로 승격.
+async function fetchComplexFromDb(sgg: string, apt: string): Promise<RawComplex | null> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("deal_date, price, area, pyeong, floor, dealing_gbn, canceled, trade_type, apt_dong, umd_nm, build_year, apt_seq")
+    .eq("sgg_cd", sgg)
+    .eq("apt_nm", apt)
+    .order("deal_date", { ascending: true })
+    .limit(3000);
+  const rows = (data ?? []) as {
+    deal_date: string; price: number; area: number; pyeong: number;
+    floor: number | null; dealing_gbn: string; canceled: boolean;
+    trade_type: string | null; apt_dong: string | null;
+    umd_nm: string | null; build_year: number | null; apt_seq: string | null;
+  }[];
+  if (rows.length === 0) return null;
+  const deals: RawDeal[] = rows.map((r) => ({
+    d: r.deal_date,
+    p: r.price,
+    a: r.area,
+    py: r.pyeong,
+    fl: r.floor ?? null,
+    g: r.dealing_gbn,
+    c: r.canceled,
+    tt: r.trade_type ?? "매매",
+    dg: r.apt_dong ?? null,
+  }));
+  return {
+    apt_nm: apt,
+    sgg_cd: sgg,
+    apt_seq: rows[0].apt_seq ?? null,
+    umd_nm: rows[0].umd_nm ?? null,
+    build_year: rows[0].build_year ?? null,
+    deals,
+  };
+}
+
 // R2 전체이력 + DB 최근 거래를 병합한 단지 1개. 요청 내 중복 호출은 cache로 dedupe.
 // R2 fetch와 DB 최근거래를 병렬로(둘 다 같은 apt를 키로 쓰므로 의존 없음).
+// R2 파일이 없으면(fetch_peaks 미수집) DB 핫윈도우로 폴백해 404를 피한다.
 export const fetchComplexMerged = cache(
   async (sgg: string, apt: string): Promise<RawComplex | null> => {
     const [cx, recent] = await Promise.all([
       fetchComplex(sgg, apt),
       fetchRecentDeals(sgg, apt),
     ]);
-    if (!cx) return null;
+    if (!cx) return fetchComplexFromDb(sgg, apt);
     return { ...cx, deals: mergeDeals(cx.deals, recent) };
   }
 );
