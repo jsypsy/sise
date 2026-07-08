@@ -28,17 +28,18 @@ jobs:
           key=os.environ["MOLIT_KEY"]; ym=os.environ["YM"]
           sggs=[s.strip() for s in os.environ["SGGS"].split(",") if s.strip()]
           ep="https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
-          print(f"ym={ym}  코드 {len(sggs)}개\n코드 | resultCode | totalCount | 첫 단지")
+          print(f"ym={ym}  코드 {len(sggs)}개\n코드 | resultCode | totalCount | 읍면동(단지) 샘플 3건")
           for sgg in sggs:
-              q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"1"})
+              # 읍면동 샘플까지 출력 — 코드→지역 매핑을 단지명 추정이 아니라 법정동으로 확정.
+              q=urllib.parse.urlencode({"serviceKey":key,"LAWD_CD":sgg,"DEAL_YMD":ym,"pageNo":"1","numOfRows":"3"})
               try:
                   root=ET.fromstring(urllib.request.urlopen(ep+"?"+q,timeout=30).read())
               except Exception as e:
                   print(f"  {sgg} | 실패 {e}"); continue
               rc=root.findtext(".//resultCode") or "?"
               tc=root.findtext(".//totalCount") or "?"
-              nm=root.findtext(".//item/aptNm") or ""
+              samples=[f"{(i.findtext('umdNm') or '?')}({(i.findtext('aptNm') or '?')})" for i in root.findall(".//item")]
               flag=" ← 데이터有" if (tc.isdigit() and int(tc)>0) else (" (0)" if tc=="0" else "")
-              print(f"  {sgg} | rc={rc} | total={tc}{flag} | {nm}")
+              print(f"  {sgg} | rc={rc} | total={tc}{flag} | {' / '.join(samples)}")
               time.sleep(0.3)
           PY
