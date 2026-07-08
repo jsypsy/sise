@@ -1,0 +1,20 @@
+# 임의 SELECT를 새(서울) Supabase에 읽기 전용으로 실행해 로그로 출력한다.
+# db-verify(고정 쿼리)와 달리 입력 SQL을 받는 진단용. 쓰기 금지 — SELECT만 넣을 것.
+name: db-query (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: '실행할 SELECT 문'
+        required: true
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query
+        env:
+          SQL: ${{ inputs.sql }}
+        run: |
+          psql "${{ secrets.NEW_DB_URL }}" -v ON_ERROR_STOP=1 -c "BEGIN READ ONLY; $SQL; COMMIT;"
