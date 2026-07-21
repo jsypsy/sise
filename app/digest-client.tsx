@@ -272,13 +272,18 @@ export default function DigestClient({ digest }: { digest: Digest }) {
         </div>
       </div>
 
-      {/* 공유 이미지용 카드 — 화면 밖에서만 렌더되어 캡처 대상이 된다(페이지엔 안 보임).
-          이미지는 단독 배포되므로 마스트헤드·출처 푸터로 브랜딩한다. */}
+      {/* 공유 이미지용 카드 — 0×0 overflow:hidden 래퍼로 감싸 사용자에겐 안 보이되,
+          카드 자체는 뷰포트 원점(0,0)에 실제 레이아웃돼 캡처된다.
+          (left:-10000px 식 화면 밖 배치는 html-to-image가 백지를 내는 버그가 있어 금지 —
+           Playwright 재현으로 확인. 이미지는 단독 배포되므로 마스트헤드·출처 푸터로 브랜딩.) */}
+      <div
+        aria-hidden
+        style={{ position: "fixed", left: 0, top: 0, width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}
+      >
       <div
         ref={cardRef}
-        aria-hidden
         className="bg-[var(--paper)] px-5 py-5"
-        style={{ position: "fixed", left: -10000, top: 0, width: 460, pointerEvents: "none" }}
+        style={{ width: 460 }}
       >
         <div className="flex items-end justify-between border-b-2 border-[var(--line-strong)] pb-2.5">
           <div className="flex flex-col">
@@ -305,6 +310,7 @@ export default function DigestClient({ digest }: { digest: Digest }) {
           </span>
           <span className="text-[10px] font-bold text-[var(--ink)]">sise</span>
         </div>
+      </div>
       </div>
     </div>
   );
