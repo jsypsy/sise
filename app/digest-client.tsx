@@ -170,10 +170,14 @@ export default function DigestClient({ digest }: { digest: Digest }) {
 
       // 1) 모바일: 네이티브 공유 시트(카톡·SNS로 바로 전송, 저장 단계 없음)
       if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        // 이미지에 URL을 동봉 → 지원 플랫폼에선 링크도 함께 전달돼 유입 경로가 생긴다.
+        const shareUrl =
+          typeof window !== "undefined" ? window.location.href : "https://sise.today/digest";
         await navigator.share({
           files: [file],
           title: "시세 — 아파트 실거래 시그널",
-          text: `아파트 실거래 시그널 ${date}`,
+          text: `아파트 실거래 시그널 ${date} — 매일 아침 신고가·반등 sise.today`,
+          url: shareUrl,
         });
         return; // 공유 시트가 떴으면 토스트는 생략
       }
@@ -308,7 +312,8 @@ export default function DigestClient({ digest }: { digest: Digest }) {
           <span className="text-[10px] text-[var(--ink-soft)]">
             국토부 실거래가 기반 · 직거래/취소 제외 · 정부 공식 아님
           </span>
-          <span className="text-[10px] font-bold text-[var(--ink)]">sise</span>
+          {/* 이미지 단독 배포 시 사이트를 찾아올 수 있게 도메인을 카드에 각인 */}
+          <span className="text-[11px] font-bold text-[var(--red)]">sise.today</span>
         </div>
       </div>
       </div>

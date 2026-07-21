@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import type { Signal } from "./types";
 import { won } from "./format";
 import { CODE_TO_NAME } from "./regions";
+import { SITE_URL } from "./site";
 
 // 0.1억 단위 반올림 축약 표기 (예: 289000 → "28.9억", 300000 → "30억")
 function wonShort(price: number): string {
@@ -111,6 +112,8 @@ export async function buildDigest(): Promise<Digest> {
   }
 
   text += "\nⓘ 국토부 실거래가 기반 · 직거래/취소거래 제외";
+  // 복붙 배포 시 사이트로 돌아오는 유일한 경로 → 반드시 URL을 남긴다.
+  text += `\n\n▶ 매일 아침 신고가·반등 전체 보기\n${SITE_URL}/digest`;
 
   return { date, total: signals.length, highs, rebs, text };
 }
