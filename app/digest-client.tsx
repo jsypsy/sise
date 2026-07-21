@@ -133,17 +133,16 @@ export default function DigestClient({ digest }: { digest: Digest }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // 링크 공유 — 이미지 대신 URL을 보내 받는 사람이 미리보기(OG)를 보고 눌러 들어오게 한다.
-  // 카페·단톡방 유입의 핵심 경로(이미지 단독 공유는 클릭 유도가 안 됨).
+  // 링크 공유 — URL만 보내 받는 사람이 OG 미리보기(제목·설명·이미지)를 보고 눌러 들어오게 한다.
+  // text를 넣으면 카톡 등에서 미리보기 아래에 중복 문구가 붙어 지저분해지므로 URL만 공유한다.
   async function handleShareLink() {
     const url = typeof window !== "undefined" ? window.location.href : "https://sise.today/digest";
-    const shareText = `아파트 실거래 시그널 ${date} — 오늘의 신고가·반등`;
     try {
       if (typeof navigator.share === "function") {
-        await navigator.share({ title: "시세 — 아파트 실거래 시그널", text: shareText, url });
+        await navigator.share({ url });
         return;
       }
-      await navigator.clipboard.writeText(`${shareText}\n${url}`);
+      await navigator.clipboard.writeText(url);
       flash({ kind: "ok", msg: "링크 복사됨 — 카페·단톡방에 붙여넣기" });
     } catch (e) {
       if ((e as Error).name !== "AbortError") flash({ kind: "err", msg: "링크 공유 실패" });
@@ -170,15 +169,11 @@ export default function DigestClient({ digest }: { digest: Digest }) {
 
       // 1) 모바일: 네이티브 공유 시트(카톡·SNS로 바로 전송, 저장 단계 없음)
       if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-        // 이미지에 URL을 동봉 → 지원 플랫폼에선 링크도 함께 전달돼 유입 경로가 생긴다.
+        // 이미지에 URL만 동봉(중복 문구 없이) → 지원 플랫폼에선 링크도 함께 전달돼 유입 경로가 생긴다.
+        // 도메인은 이미지 안에 각인돼 있으므로 별도 text는 넣지 않는다(미리보기 하단 중복 방지).
         const shareUrl =
           typeof window !== "undefined" ? window.location.href : "https://sise.today/digest";
-        await navigator.share({
-          files: [file],
-          title: "시세 — 아파트 실거래 시그널",
-          text: `아파트 실거래 시그널 ${date} — 매일 아침 신고가·반등 sise.today`,
-          url: shareUrl,
-        });
+        await navigator.share({ files: [file], url: shareUrl });
         return; // 공유 시트가 떴으면 토스트는 생략
       }
 
