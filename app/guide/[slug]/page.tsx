@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GUIDES, getGuide } from "@/lib/guides";
+import { OG_IMAGE } from "@/lib/site";
 
 type Params = Promise<{ slug: string }>;
 
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: g.title,
     description: g.description,
     alternates: { canonical: `/guide/${g.slug}` },
-    openGraph: { title: `${g.title} · 시세`, description: g.description, url: `/guide/${g.slug}` },
+    openGraph: { title: `${g.title} · 시세`, description: g.description, url: `/guide/${g.slug}`, images: [OG_IMAGE] },
   };
 }
 

@@ -133,6 +133,23 @@ export default function DigestClient({ digest }: { digest: Digest }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // 링크 공유 — 이미지 대신 URL을 보내 받는 사람이 미리보기(OG)를 보고 눌러 들어오게 한다.
+  // 카페·단톡방 유입의 핵심 경로(이미지 단독 공유는 클릭 유도가 안 됨).
+  async function handleShareLink() {
+    const url = typeof window !== "undefined" ? window.location.href : "https://sise.today/digest";
+    const shareText = `아파트 실거래 시그널 ${date} — 오늘의 신고가·반등`;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: "시세 — 아파트 실거래 시그널", text: shareText, url });
+        return;
+      }
+      await navigator.clipboard.writeText(`${shareText}\n${url}`);
+      flash({ kind: "ok", msg: "링크 복사됨 — 카페·단톡방에 붙여넣기" });
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") flash({ kind: "err", msg: "링크 공유 실패" });
+    }
+  }
+
   async function handleShareImage() {
     const node = cardRef.current;
     if (!node || busy) return;
@@ -206,11 +223,17 @@ export default function DigestClient({ digest }: { digest: Digest }) {
         최근 신고 등록 기준 신고가·반등 — 일·월요일은 전 영업일 데이터. <b>이미지로 공유</b>하면 색·정렬 그대로, 텍스트 복붙도 가능합니다.
       </p>
 
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button
+          onClick={handleShareLink}
+          className="bg-[var(--ink)] text-[var(--paper)] text-sm px-4 py-2 rounded font-medium hover:opacity-80 transition-opacity"
+        >
+          링크 공유
+        </button>
         <button
           onClick={handleShareImage}
           disabled={busy}
-          className="bg-[var(--ink)] text-[var(--paper)] text-sm px-4 py-2 rounded font-medium hover:opacity-80 transition-opacity disabled:opacity-50"
+          className="border border-[var(--line-strong)] text-sm px-4 py-2 rounded hover:bg-[var(--paper-2)] transition-colors disabled:opacity-50"
         >
           {busy ? "만드는 중…" : "이미지로 공유"}
         </button>

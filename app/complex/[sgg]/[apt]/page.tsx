@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { fetchComplexMerged, summarize, locationLabel, fetchAptsInSgg, complexHref } from "@/lib/complex";
 import { complexNarrative } from "@/lib/summary";
 import { won } from "@/lib/format";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, OG_IMAGE } from "@/lib/site";
 import ComplexDetail from "../../complex-detail";
 import WatchButton from "../../../watch-button";
 import { jsonLdString } from "@/lib/jsonld";
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: { absolute: `${cx.apt_nm} 실거래가 · ${loc} | 시세` },
     description: desc,
     alternates: { canonical },
-    openGraph: { title: `${cx.apt_nm} 실거래가 · ${loc}`, description: desc, url: canonical },
+    openGraph: { title: `${cx.apt_nm} 실거래가 · ${loc}`, description: desc, url: canonical, images: [OG_IMAGE] },
     // 거래 이력이 너무 적은 단지(R2 미수집 DB폴백 등)는 '얇은 페이지 대량 색인'으로
     // 저품질 판정을 유발하므로 색인 제외. 사용자는 그대로 볼 수 있고(follow로 링크도 전달),
     // R2가 채워져 이력이 쌓이면 재검증 때 자동으로 색인 허용된다.

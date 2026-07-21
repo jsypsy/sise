@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { won } from "@/lib/format";
 import { CODE_TO_NAME } from "@/lib/regions";
 import { fetchAptsInSgg, complexHref, type AptSummary } from "@/lib/complex";
+import { OG_IMAGE } from "@/lib/site";
 
 type Params = Promise<{ sgg: string }>;
 
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: { absolute: `${region} 아파트 실거래가 — 단지별 시세 | 시세` },
     description: `${region} 아파트 단지별 매매 실거래가·신고가. 국토부 실거래가 기반 단지 목록과 최신 시세.`,
     alternates: { canonical: `/complex/${sgg}` },
-    openGraph: { title: `${region} 아파트 실거래가`, url: `/complex/${sgg}` },
+    openGraph: { title: `${region} 아파트 실거래가`, url: `/complex/${sgg}`, images: [OG_IMAGE] },
   };
 }
 

@@ -6,6 +6,11 @@ export const SITE_URL = (
 
 export const SITE_NAME = "시세";
 export const SITE_TAGLINE = "아파트 매매 실거래 시그널";
+
+// 공유 미리보기(OG/트위터) 기본 이미지. 페이지가 openGraph를 재정의하면 루트 파일 이미지가
+// 상속되지 않아 og:image가 통째로 빠진다(카페·카톡 공유 시 미리보기 이미지 없음 → 유입 손실).
+// 각 페이지 openGraph에 이 값을 명시해 모든 공유 링크가 미리보기 이미지를 갖게 한다.
+export const OG_IMAGE = "/opengraph-image.png";
 export const SITE_DESCRIPTION =
   "국토부 실거래가 기반 매일 아파트 신고가·반등 시그널. 카페·단톡방에 바로 복붙·이미지로 공유.";
 

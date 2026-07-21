@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { REGIONS } from "@/lib/regions";
+import { OG_IMAGE } from "@/lib/site";
 import ComplexClient from "./complex-client";
 
 export const metadata: Metadata = {
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   description:
     "아파트 단지별 실거래가 전체 이력·차트·신고가 추이를 조회. 국토부 실거래가 기반, 전국 시군구별 단지 목록.",
   alternates: { canonical: "/complex" },
-  openGraph: { title: "단지 조회 · 시세", url: "/complex" },
+  openGraph: { title: "단지 조회 · 시세", url: "/complex", images: [OG_IMAGE] },
 };
 
 // 지역 디렉터리는 정적 데이터(REGIONS)라 DB 비용 0 — 검색창뿐이던 페이지에
