@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { buildRegionReport, getRegionTotals, REPORT_MIN_TX, type ReportItem } from "@/lib/report";
 import { complexHref } from "@/lib/complex";
 import { CODE_TO_NAME } from "@/lib/regions";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, OG_IMAGE } from "@/lib/site";
 import { jsonLdString } from "@/lib/jsonld";
 
 type Params = Promise<{ sgg: string }>;
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: { absolute: `${region} 아파트 시장 리포트 — 신고가·반등 동향 | 시세` },
     description: desc,
     alternates: { canonical: `/report/${sgg}` },
-    openGraph: { title: `${region} 아파트 시장 리포트`, description: desc, url: `/report/${sgg}` },
+    openGraph: { title: `${region} 아파트 시장 리포트`, description: desc, url: `/report/${sgg}`, images: [OG_IMAGE] },
     // 시그널이 적은 지역은 얇은 리포트라 색인 제외(데이터 쌓이면 자동 색인).
     ...(!report || report.tx < REPORT_MIN_TX ? { robots: { index: false, follow: true } } : {}),
   };

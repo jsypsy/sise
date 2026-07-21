@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { POSTS, POSTS_SORTED, getPost } from "@/lib/blog";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, OG_IMAGE } from "@/lib/site";
 import { jsonLdString } from "@/lib/jsonld";
 
 type Params = Promise<{ slug: string }>;
@@ -25,6 +25,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
       description: p.description,
       url: `/blog/${p.slug}`,
       publishedTime: p.date,
+      images: [OG_IMAGE],
     },
   };
 }

@@ -4,13 +4,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buildNationalReport, getRegionTotals, groupReportRegions } from "@/lib/report";
 import { CODE_TO_NAME } from "@/lib/regions";
+import { OG_IMAGE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "아파트 시장 리포트 — 지역별 신고가·반등 동향",
   description:
     "국토부 실거래가를 가공한 지역별 아파트 시장 리포트. 최근 신고가·반등·거래 동향을 지역별로 분석해 정리했습니다.",
   alternates: { canonical: "/report" },
-  openGraph: { title: "아파트 시장 리포트 · 시세", url: "/report" },
+  openGraph: { title: "아파트 시장 리포트 · 시세", url: "/report", images: [OG_IMAGE] },
 };
 
 function gu(sgg: string): string {
